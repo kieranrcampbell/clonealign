@@ -66,7 +66,8 @@ log_ratio_mug <- function(y, L, g, mu_g_prime, mu_g, params, hyperparams, s) {
 
   prior <- dnorm(log(mu_g_prime), params$nu_mu, 1 / sqrt(params$tau_mu), log = TRUE ) -
     dnorm(log(mu_g), params$nu_mu, 1 / sqrt(params$tau_mu), log = TRUE )
-  ll + prior
+  jacobian <- log(mu_g) - log(mu_g_prime)
+  ll + prior + jacobian
 }
 
 log_ratio_phig <- function(y, L, g, phi_g_prime, phi_g, params, hyperparams, s) {
@@ -74,7 +75,8 @@ log_ratio_phig <- function(y, L, g, phi_g_prime, phi_g, params, hyperparams, s) 
   ll <- sum(dnbinom2(y, mu, phi_g_prime)) - sum(dnbinom2(y, mu, phi_g))
   prior <- dnorm(log(phi_g_prime), params$nu_phi, 1 / sqrt(params$tau_phi), log = TRUE) -
     dnorm(log(phi_g), params$nu_phi, 1 / sqrt(params$tau_phi), log = TRUE)
-  ll + prior
+  jacobian <- log(phi_g) - log(phi_g_prime)
+  ll + prior + jacobian
 }
 
 joint_density <- function(Y, L, params, hyperparams, s) {
@@ -299,7 +301,7 @@ gibbs_sample_precision <- function(a, b, mu_tilde, nu) {
 #' @export
 infer_hierarchical <- function(Y, L, s,
                          delta_phi = 5e-1,
-                         delta_mu = 5e-1,
+                         delta_mu = 1e-1,
                          n_iter = 200,
                          burn = n_iter / 2,
                          phi_init = 1,
@@ -345,9 +347,9 @@ infer_hierarchical <- function(Y, L, s,
     a_phi = 2,
     b_phi = 1,
     nu_phi_0 = 0,
-    tau_phi_0 = 0.1,
+    tau_phi_0 = 0.01,
     nu_mu_0 = 0,
-    tau_mu_0 = 0.1
+    tau_mu_0 = 0.01
   )
 
   # Always normalise L
@@ -355,10 +357,12 @@ infer_hierarchical <- function(Y, L, s,
 
   pi_trace <- matrix(NA, nrow = n_iter, ncol = N)
   gamma_trace <- matrix(NA, nrow = n_iter, ncol = C)
-
   phi_trace <- matrix(NA, nrow = n_iter, ncol = G)
-
   mu_trace <- matrix(NA, nrow = n_iter, ncol = G)
+  nu_mu_trace <- rep(NA, n_iter)
+  tau_mu_trace <- rep(NA, n_iter)
+  nu_phi_trace <- rep(NA, n_iter)
+  tau_phi_trace <- rep(NA, n_iter)
 
   phi_accept <- rep(0, n_iter)
 
@@ -408,12 +412,18 @@ infer_hierarchical <- function(Y, L, s,
         density_normal(mu_t_new, log_mu, delta_mu)
       log_rat <- log_rat + mu_t_new - log_mu # Adjust Jacobian
 
+      if(is.na(log_rat)) {
+        print(mu_t_new)
+        print(log_mu)
+        print(params$phi[g])
+        stop("Waah")
+      }
       if(log_rat > log(runif(1))) {
         params$mu[g] <- exp(mu_t_new)
         mu_accept[i] <- mu_accept[i] + 1
       }
-      mu_trace[i,] <- params$mu
     }
+    mu_trace[i,] <- params$mu
     mu_accept[i] <- mu_accept[i] / G
 
     ## MH proposal for phi
@@ -431,23 +441,31 @@ infer_hierarchical <- function(Y, L, s,
         params$phi[g] <- exp(phi_t_new)
         phi_accept[i] <- phi_accept[i] + 1
       }
-      phi_trace[i,] <- params$phi
-
     }
+    phi_trace[i,] <- params$phi
+    phi_accept[i] <- phi_accept[i] / G
 
-  # Gibbs updates for (nu, phi) "hyperparameters"
-  params$nu_mu <- gibbs_sample_mean(log(params$mu), params$tau_mu,
-                                    hyperparams$tau_mu_0, hyperparams$nu_mu_0)
-  params$nu_phi <- gibbs_sample_mean(log(params$phi), params$tau_phi,
+    # plot(params$phi)
+    # print(glue("Phi accept: {phi_accept[i]}"))
+
+    # Gibbs updates for (nu, phi) "hyperparameters"
+    params$nu_mu <- gibbs_sample_mean(log(params$mu), params$tau_mu,
+                                      hyperparams$tau_mu_0, hyperparams$nu_mu_0)
+   params$nu_phi <- gibbs_sample_mean(log(params$phi), params$tau_phi,
                                     hyperparams$tau_phi_0, hyperparams$nu_phi_0)
 
-  params$tau_mu <- gibbs_sample_precision(hyperparams$a_mu, hyperparams$b_mu,
-                                           log(params$mu), params$nu_mu)
-  params$tau_phi <- gibbs_sample_precision(hyperparams$a_phi, hyperparams$b_phi,
-                                           log(params$phi), params$nu_phi)
+    params$tau_mu <- gibbs_sample_precision(hyperparams$a_mu, hyperparams$b_mu,
+                                             log(params$mu), params$nu_mu)
+    params$tau_phi <- gibbs_sample_precision(hyperparams$a_phi, hyperparams$b_phi,
+                                             log(params$phi), params$nu_phi)
 
+    nu_mu_trace[i] <- params$nu_mu
+    nu_phi_trace[i] <- params$nu_phi
 
-} # End MCMC iteration for loop
+    tau_mu_trace[i] <- params$tau_mu
+    tau_phi_trace[i] <- params$tau_phi
+
+  } # End MCMC iteration for loop
 
 
 
@@ -460,7 +478,11 @@ infer_hierarchical <- function(Y, L, s,
       mu = mu_trace,
       phi = phi_trace,
       pi = pi_trace,
-      gamma = gamma_trace
+      gamma = gamma_trace,
+      nu_mu = nu_mu_trace,
+      nu_phi = nu_phi_trace,
+      tau_mu = tau_mu_trace,
+      tau_phi = tau_phi_trace
     ),
     accepts = list(
       mu = mu_accept,
