@@ -2,10 +2,13 @@
 
 export(basic_dispersion_estimates)
 export(clone_assignments)
+export(clonealign_em)
 export(clonealign_vb)
 export(infer_hierarchical)
 export(to_mcmc)
+importFrom(BiocParallel,bclapply)
 importFrom(MCMCpack,rdirichlet)
 importFrom(coda,mcmc)
 importFrom(glue,glue)
 importFrom(matrixStats,colVars)
+importFrom(matrixStats,logSumExp)

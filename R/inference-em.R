@@ -1,19 +1,9 @@
 
-
-#' @export
-likelihood_yn <- function(y, L, s, pi, params) {
-  ll <- 0
-
-  # Likelihood
-  # for(g in seq_along(y)) {
-    # if(L[g, pi ] > 0) {
-      m <- L[, pi] * s * params[, 'mu']
-      ll <- ll + sum(dnbinom2(y, mu = m, size = params[, 'phi']))
-    #} else {
-    #  stop("Zero L's not supported")
-    #  ll <- ll + dpois(y[g], 0.1, log = TRUE)
-    #}
-  #}
+#' @keywords internal
+likelihood_yn <- function(y, L, s_n, pi, params) {
+  m <- L[, pi] * s_n * params[, 'mu']
+  phi <- params[, 'phi']
+  ll <- sum(dnbinom2(y, mu = m, size = phi))
   ll
 }
 
@@ -38,7 +28,6 @@ p_pi <- function(data, params) {
 
 #' Computes Q(theta|theta^(t))
 #' (function to be optimised under EM)
-#' @export
 Q_g <- function(pars, y, l, gamma, data) {
   mu <- pars[1]
   phi <- pars[2]
@@ -47,32 +36,50 @@ Q_g <- function(pars, y, l, gamma, data) {
     m <- l[c] * data$s * mu # N length vector for given gene of means
     l_c <- dnbinom2(y, mu = m, size = phi) # p(y_g | pi)
     qq <- qq + sum(gamma[,c] * l_c )
+    # print(qq)
   }
   -qq
 }
 
-#' @export
-Q <- function(pars, Y, L, gamma, data) {
-  mu <- pars[1:data$G]
-  phi <- pars[(data$G+1):(2*data$G)]
-  qq <- 0
-  for(g in seq_len(data$G)) {
-    for(c in seq_len(data$C)) {
-      m <- L[g,c] * data$s * mu[g] # N length vector for given gene of means
-      l_c <- dnbinom2(Y[,g], mu = m, size = phi[g]) # p(y_g | pi)
-      qq <- qq + sum(gamma[,c] * l_c )
-    }
-  }
-  -qq
+
+
+
+#' @keywords internal
+log_likelihood <- function(params, data) {
+  ll <- 0
+  mu <- params[,'mu']
+  phi <- params[,'phi']
+
+  for(n in seq_len(data$N)) {
+    pnc <- sapply(seq_len(data$C), function(c) {
+     sum(dnbinom2(data$Y[n,], mu * data$L[,c] * data$s[n], size = phi))
+    })
+    ll <- ll + logSumExp(pnc)
+   }
+  ll
 }
 
-#' importFrom glue glue
+#' Expectation-maximization for assigning scRNA-seq data
+#' to clone-of-origin
+#'
+#' @param Y cell-by-gene expression matrix of raw counts
+#' @param L gene-by-clone matrix of copy number variation
+#' @param s Vector of cell size factors. If NULL computed using
+#' \code{scran::computeSumFactors}
+#' @param max_iter Maximum number of EM iterations before algorithm is terminated
+#' @param tol Relative tolerance in percent below which the log-likelihood is considered converged
+#' @param gene_filter_threshold Genes with mean counts below or equal to this threshold will
+#' be filtered out (removes genes with no counts by default)
+#' @importFrom glue glue
+#' @importFrom BiocParallel bclapply
+#'
 #' @export
-clonealign_em <- function(Y, L, s = NULL, n_iter, tol = 1e-3,
-                          parallelise = TRUE) {
+clonealign_em <- function(Y, L, s = NULL, max_iter = 100, tol = 1e-5,
+                          gene_filter_threshold = 0,
+                          bp_param = bpparam()) {
 
-  zero_gene_means <- colMeans(Y) == 0
-  message(glue("Removing {sum(zero_gene_means)} genes with zero counts"))
+  zero_gene_means <- colMeans(Y) <= gene_filter_threshold
+  message(glue("Removing {sum(zero_gene_means)} genes with low counts"))
   Y <- Y[, !zero_gene_means]
   L <- L[!zero_gene_means,]
 
@@ -83,13 +90,14 @@ clonealign_em <- function(Y, L, s = NULL, n_iter, tol = 1e-3,
 
   # Sanity checks
   stopifnot(nrow(L) == G)
-  stopifnot(length(s) == N)
-  stopifnot(all(s > 0))
 
 
   if(is.null(s)) {
     s <- scran::computeSumFactors(t(Y))
   }
+  stopifnot(length(s) == N)
+  stopifnot(all(s > 0))
+
 
   # Always normalise L
   L <- t( t(L) / colMeans(L) )
@@ -110,81 +118,59 @@ clonealign_em <- function(Y, L, s = NULL, n_iter, tol = 1e-3,
     C = C
   )
 
-  q_old <- NA
-  qvals <- matrix(NA, nrow = n_iter, ncol = G)
+  ll_old <- NA
 
-  for(i in seq_len(n_iter)) {
+  for(i in seq_len(max_iter)) {
 
     # E step
     gamma <- p_pi(data, params)
 
-    # print(c(sqrt(mean(gamma^2)), sqrt(mean(params[,'mu']^2)), sqrt(mean(params[,'phi']^2))))
-    # Q_g(params[g,], Y[,g], L[g,], gamma, data)
-    # Q(as.vector(params), Y, L, gamma, data)
-
     # M step
-    if(parallelise) {
-      pnew <- sapply(seq_len(data$G), function(g) {
-        opt <- optim(par = params[g, ], # (mu,phi)
-                     fn = Q_g,
-                     y = Y[,g], l = L[g,], gamma = gamma, data = data,
-                     method = "L-BFGS-B",
-                     lower = c(1e-9,1e-9))
-        c(opt$par, -opt$value)
-      })
-      params <- t(pnew[c('mu', 'phi'),])
-      # print(c(dim(qvals), dim(pnew)))
-      qvals[i,] <- pnew[3,]
-      q_new <- sum(pnew[3,])
-    } else {
-      par <- as.vector(params)
-      opt <- optim(par = par, # (mu,phi)
-                   fn = Q,
-                   Y = Y, L = L, gamma = gamma, data = data,
-                   method = "L-BFGS-B",
-                   lower = rep(0.00001, 2 * data$G),
-                   control = list(maxit = 1e3))
-      params <- matrix(opt$par, ncol = 2)
-      colnames(params) <- c("mu", "phi")
-      q_new <- -opt$value
-    }
-    q_diff <- ((q_new - q_old)) #  / q_old * 100)
 
-    message(glue("Old: {q_old}\tNew: {q_new}\tChange: {q_diff}"))
+    pnew <- bplapply(seq_len(data$G), function(g) {
+      opt <- optim(par = params[g,], # (mu,phi)
+                   fn = Q_g,
+                   # gr = grad_g,
+                   y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
+                   method = "L-BFGS-B",
+                   lower = c(1e-10, 1e-10),
+                   upper = c(max(data$Y), 1e6),
+                   control = list())
+      if(opt$convergence != 0) {
+        # TODO - deal with nonconvergence somehow
+        # print(opt$message)
+      }
+      c(opt$par, -opt$value)
+    }, BPPARAM = bp_param)
+    pnew <- do.call(rbind, pnew)
+    params <- pnew[,c('mu', 'phi')]
+    ll <- log_likelihood(params, data)
+
+    ll_diff <- (ll - ll_old)  / abs(ll_old) * 100
+
+    message(glue("Old: {ll_old}\tNew: {ll}\tChange: {ll_diff}"))
     # message(glue("New log-likelihood: {q_new}"))
 
-    # if(!is.na(q_diff)) {
-    #   if(q_diff < tol) {
-    #     print(glue("Converged after {i} iterations"))
-    #     break
-    #   }
-    # }
-    q_old <- q_new
+    if(!is.na(ll_diff)) {
+      if(ll_diff < tol) {
+        print(glue("Converged after {i} iterations"))
+        break
+      }
+    }
+    ll_old <- ll
   }
 
   gamma <- p_pi(data, params)
   rlist <- list(
     gamma = gamma,
     mu = params[, 'mu'],
-    phi = params[, 'phi'],
-    qvals = qvals
+    phi = params[, 'phi']
   )
+
+  if(i == max_iter) {
+    message("Maximum number of iterations reached; consider increasing max_iter")
+  }
+  return(rlist)
 }
 
-
-## Testing time
-
-test <- function() {
-  data2 <- list(
-    Y = Y[1:3, 1:2],
-    L = matrix(c(0,.5,1,0.1), ncol = 2),
-    s = s[1:3],
-    N = 3,
-    G = 2,
-    C = 2
-  )
-  params2 <- matrix(1, nrow = data2$G, ncol = 2)
-  colnames(params2) <- c('mu', 'phi')
-  p_pi(data2, params2)
-}
 
