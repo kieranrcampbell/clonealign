@@ -76,7 +76,7 @@ log_likelihood <- function(params, data) {
 #' @param gene_filter_threshold Genes with mean counts below or equal to this threshold will
 #' be filtered out (removes genes with no counts by default)
 #' @importFrom glue glue
-#' @importFrom BiocParallel bclapply
+#' @importFrom BiocParallel bplapply
 #'
 #' @export
 clonealign_em <- function(Y, L, s = NULL, max_iter = 100, tol = 1e-5,
