@@ -75,11 +75,12 @@ log_likelihood <- function(params, data) {
 #' @param tol Relative tolerance in percent below which the log-likelihood is considered converged
 #' @param gene_filter_threshold Genes with mean counts below or equal to this threshold will
 #' be filtered out (removes genes with no counts by default)
+#'
 #' @importFrom glue glue
 #' @importFrom BiocParallel bplapply
 #'
 #' @export
-clonealign_em <- function(Y, L, s = NULL, max_iter = 100, tol = 1e-5,
+inference_em <- function(Y, L, s = NULL, max_iter = 100, tol = 1e-5,
                           gene_filter_threshold = 0,
                           bp_param = bpparam()) {
 
