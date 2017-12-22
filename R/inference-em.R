@@ -41,6 +41,11 @@ Q_g <- function(pars, y, l, gamma, data) {
   -qq
 }
 
+#' Computes map clone assignment given EM object
+#' @export
+clone_assignment <- function(em) {
+  apply(em$gamma, 1, which.max)
+}
 
 
 
