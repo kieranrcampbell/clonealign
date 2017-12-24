@@ -4,18 +4,16 @@
 \alias{clonealign}
 \title{Assign scRNA-seq to clone-of-origin}
 \usage{
-clonealign(gene_expression_data, copy_number_data, s = NULL, max_iter = 100,
-  rel_tol = 1e-05, gene_filter_threshold = 0, bp_param = bpparam())
+clonealign(gene_expression_data, copy_number_data, size_factors = NULL,
+  max_iter = 100, rel_tol = 1e-05, gene_filter_threshold = 0,
+  verbose = TRUE, bp_param = bpparam())
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
-\code{SingleCellExperiment}. See \link{details}.}
+\code{SingleCellExperiment}. This should contain raw counts. See \link{details}.}
 
 \item{copy_number_data}{A matrix of copy number calls for each clone or a \code{SummarizedExperiment}.
 See \link{details}.}
-
-\item{s}{Vector of cell size factors. If NULL computed using
-\code{scran::computeSumFactors}}
 
 \item{max_iter}{Maximum number of EM iterations before algorithm is terminated}
 
@@ -25,13 +23,30 @@ EM algorithm is considered converged}
 \item{gene_filter_threshold}{Genes with mean counts below or equal to this threshold will
 be filtered out (removes genes with no counts by default)}
 
+\item{verbose}{Should warnings and EM convergence information be printed? Default TRUE}
+
 \item{bp_param}{Parameters for parallel optimization of the Q function during EM. Default parameters
 taken by call to \code{bpparam()}. See \code{?bpparam} for more details.}
+
+\item{s}{Vector of cell size factors. If NULL computed using
+\code{scran::computeSumFactors}}
 }
 \description{
-Assign scRNA-seq to clone-of-origin
+\code{clonealign} assigns single cells (measured with RNA-seq) to their clones of origin, where
+the clones have been inferred from ultra-shallow scDNA-seq and collated into copy number profiles.
 }
 \details{
 \strong{Input format}
 ABC
+
+\strong{EM convergence monitoring}
+
+\strong{Multithreaded optimization}
+}
+\examples{
+data(example_sce)
+cnv_data <- rowData(example_sce)[,c("A", "B", "C")]
+cal <- clonealign(example_sce, cnv_data)
+print(cal)
+clones <- cal$clone
 }

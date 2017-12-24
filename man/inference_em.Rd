@@ -5,8 +5,8 @@
 \title{Expectation-maximization for assigning scRNA-seq data
 to clone-of-origin}
 \usage{
-inference_em(Y, L, s = NULL, max_iter = 100, tol = 1e-05,
-  gene_filter_threshold = 0, bp_param = bpparam())
+inference_em(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-05,
+  gene_filter_threshold = 0, verbose = TRUE, bp_param = bpparam())
 }
 \arguments{
 \item{Y}{cell-by-gene expression matrix of raw counts}
@@ -18,7 +18,7 @@ inference_em(Y, L, s = NULL, max_iter = 100, tol = 1e-05,
 
 \item{max_iter}{Maximum number of EM iterations before algorithm is terminated}
 
-\item{tol}{Relative tolerance in percent below which the log-likelihood is considered converged}
+\item{rel_tol}{Relative tolerance in percent below which the log-likelihood is considered converged}
 
 \item{gene_filter_threshold}{Genes with mean counts below or equal to this threshold will
 be filtered out (removes genes with no counts by default)}

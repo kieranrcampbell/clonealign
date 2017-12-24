@@ -26,6 +26,12 @@ p_pi <- function(data, params) {
   gamma
 }
 
+#' @keywords internal
+dnbinom2 <- function(x, mu, size) {
+  dnbinom(x, size = size, mu = mu, log = TRUE)
+}
+
+
 #' Computes Q(theta|theta^(t))
 #' (function to be optimised under EM)
 Q_g <- function(pars, y, l, gamma, data) {
@@ -72,7 +78,7 @@ log_likelihood <- function(params, data) {
 #' @param s Vector of cell size factors. If NULL computed using
 #' \code{scran::computeSumFactors}
 #' @param max_iter Maximum number of EM iterations before algorithm is terminated
-#' @param tol Relative tolerance in percent below which the log-likelihood is considered converged
+#' @param rel_tol Relative tolerance in percent below which the log-likelihood is considered converged
 #' @param gene_filter_threshold Genes with mean counts below or equal to this threshold will
 #' be filtered out (removes genes with no counts by default)
 #'
@@ -80,12 +86,16 @@ log_likelihood <- function(params, data) {
 #' @importFrom BiocParallel bplapply
 #'
 #' @export
-inference_em <- function(Y, L, s = NULL, max_iter = 100, tol = 1e-5,
-                          gene_filter_threshold = 0,
+inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
+                          gene_filter_threshold = 0, verbose = TRUE,
                           bp_param = bpparam()) {
 
   zero_gene_means <- colMeans(Y) <= gene_filter_threshold
-  message(glue("Removing {sum(zero_gene_means)} genes with low counts"))
+
+  if(verbose) {
+    message(glue("Removing {sum(zero_gene_means)} genes with low counts"))
+  }
+
   Y <- Y[, !zero_gene_means]
   L <- L[!zero_gene_means,]
 
@@ -124,7 +134,7 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, tol = 1e-5,
     C = C
   )
 
-  ll_old <- NA
+  ll_old <- log_likelihood(params, data)
 
   for(i in seq_len(max_iter)) {
 
@@ -154,12 +164,15 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, tol = 1e-5,
 
     ll_diff <- (ll - ll_old)  / abs(ll_old) * 100
 
-    message(glue("Old: {ll_old}\tNew: {ll}\tChange: {ll_diff}"))
-    # message(glue("New log-likelihood: {q_new}"))
+    if(verbose) {
+      message(glue("{i} Current: {ll_old}\tNew: {ll}\tChange: {ll_diff}"))
+    }
 
     if(!is.na(ll_diff)) {
-      if(ll_diff < tol) {
-        print(glue("Converged after {i} iterations"))
+      if(ll_diff < rel_tol) {
+        if(verbose) {
+          print(glue("EM converged after {i} iterations"))
+        }
         break
       }
     }

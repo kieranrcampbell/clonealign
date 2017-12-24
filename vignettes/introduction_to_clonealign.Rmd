@@ -1,0 +1,57 @@
+---
+title: "Introduction to clonealign"
+author: 
+- name: "Kieran R Campbell"
+  affiliation: University of British Columbia
+  email: kicampbell@bccrc.ca
+date: "January 2018"
+output: 
+  BiocStyle::html_document
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}  
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+# Overview
+
+`clonealign` assigns cells measured using single-cell RNA-seq to their clones of origin using copy number data. This is especially useful when clones are inferred from shallow single-cell DNA-seq, in which case the copy number state of each clone is known, but the precise SNV structure is unknown.
+
+To assign cells to clones, `clonealign` makes the assumption that
+
+$$ \text{gene expression} \propto \text{number of gene copies} $$
+
+This is demonstrated in the figure below.
+
+<img src="clonealign_figure.png" width="600" align="middle" />
+
+Mathematically we have an $N \times G$ matrix $Y$ of raw gene expression counts (from RNA-seq) for $N$ cells and $G$ genes, where $y_{ng}$ is the counts to gene $g$ in cell $c$. We also have a $G \times C$ matrix $\Lambda$ of copy number variation, where $\lambda_{gc}$ is the copy number of gene $g$ in clone $c$. We introduce a clone-assigning categorical variable $\pi_n$ for each cell, where
+
+$$ \pi_n = c \text{ if cell $n$ on clone $c$} $$
+
+then `clonealign` models the expected counts in a gene and cell as
+
+$$ E[y_{ng}] = \frac{\lambda_{g,\pi_n}}{\frac{1}{N} \sum_{g'} \lambda_{g,\pi_n}} s_n \mu_g $$
+
+where $s_n$ is a cell-specific size factor (calculated by default by `scran::computeSumFactors`) and $\mu_g$ is the "base" expression in an idealised monozygotic setting. The noise distribution is assumed to be negative-binomial. Inference is performed using expectation-maximization to find maximum likelihood estimates of the clone assignments $\pi_n$ and of all other model parameters.
+ 
+# Basic usage
+
+
+# Advanced options
+
+
+# Technical
+
+```{r}
+sessionInfo()
+```
+

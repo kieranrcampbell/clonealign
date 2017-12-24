@@ -1,5 +1,5 @@
 Package: clonealign
-Title: Assigning scRNA-seq to clone-of-origin using low-depth scDNA-seq
+Title: Assigning scRNA-seq to clone-of-origin using copy number from ultra-low-depth scDNA-seq
 Version: 0.0.0.9000
 Authors@R: person("Kieran", "Campbell", email = "kieranrcampbell@gmail.com", role = c("aut", "cre"))
 Description: What the package does (one paragraph).
@@ -8,12 +8,16 @@ Imports:
   glue,
   MCMCpack,
   matrixStats,
-  BiocParallel
+  BiocParallel,
+  plyr
 Suggests:
   scran,
   BiocStyle,
-  SingleCellExperiment
+  SingleCellExperiment,
+  knitr,
+  rmarkdown
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 6.0.1
+VignetteBuilder: knitr
