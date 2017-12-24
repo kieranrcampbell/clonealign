@@ -39,7 +39,15 @@
 #'
 #' \strong{EM convergence monitoring}
 #'
+#' TODO
+#'
 #' \strong{Multithreaded optimization}
+#'
+#' TODO
+#'
+#' @return An object of class \code{clonealign_fit}. The maximum likelihood estimates of the
+#' clone assignment paramters are in the \code{clone} slot. Maximum likelihood estimates of
+#' all model parameters are in the \code{ml_params} slot.
 #'
 #' @importFrom methods is
 #' @importFrom SummarizedExperiment assay assays
@@ -155,9 +163,8 @@ clonealign <- function(gene_expression_data,
 #' @return A character string representation of \code{x}
 #' @importFrom glue glue
 #' @examples
-#' library(clonealign)
 #' data(example_clonealign_fit)
-#' print(clonealign_fit)
+#' print(example_clonealign_fit)
 print.clonealign_fit <- function(x, ...) {
   N <- length(x$clone)
   G <- length(x$ml_params$mu)

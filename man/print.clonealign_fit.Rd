@@ -19,5 +19,5 @@ Print a clonealign_fit
 }
 \examples{
 data(example_clonealign_fit)
-print(clonealign_fit)
+print(example_clonealign_fit)
 }

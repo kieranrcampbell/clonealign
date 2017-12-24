@@ -31,6 +31,11 @@ be filtered out (removes genes with no counts by default)}
 \item{bp_param}{Parameters for parallel optimization of the Q function during EM. Default parameters
 taken by call to \code{bpparam()}. See \code{?bpparam} for more details.}
 }
+\value{
+An object of class \code{clonealign_fit}. The maximum likelihood estimates of the
+clone assignment paramters are in the \code{clone} slot. Maximum likelihood estimates of
+all model parameters are in the \code{ml_params} slot.
+}
 \description{
 \code{clonealign} assigns single cells (measured with RNA-seq) to their clones of origin, where
 the clones have been inferred from ultra-shallow scDNA-seq and collated into copy number profiles.
@@ -52,7 +57,11 @@ If \code{NULL} these are computed using \code{scran::computeSumFactors}.
 
 \strong{EM convergence monitoring}
 
+TODO
+
 \strong{Multithreaded optimization}
+
+TODO
 }
 \examples{
 library(SingleCellExperiment)

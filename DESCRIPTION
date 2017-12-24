@@ -1,15 +1,16 @@
 Package: clonealign
 Title: Assigning scRNA-seq to clone-of-origin using copy number from ultra-low-depth scDNA-seq
-Version: 0.0.0.9000
+Version: 0.99
 Authors@R: person("Kieran", "Campbell", email = "kieranrcampbell@gmail.com", role = c("aut", "cre"))
 Description: clonealign assigns single-cell RNA-seq to clones of origin based on copy number data. This is useful when single-cell RNA-seq and DNA-seq are measured (separately) on the same set of cells, clones are inferred based on copy number profiles of the scDNA-seq, and the expression profile of each clone is desired.
 Depends: R (>= 3.4.0)
 Imports:
   methods,
+  stats,
   glue,
   matrixStats,
   BiocParallel,
-  BiocGenerics
+  BiocGenerics,
   plyr,
   SummarizedExperiment
 Suggests:
@@ -18,8 +19,9 @@ Suggests:
   SingleCellExperiment,
   knitr,
   rmarkdown,
-  scater
-biocViews: 
+  scater,
+    testthat
+biocViews:
   Software, 
   Transcriptomics, 
   GeneExpression, 

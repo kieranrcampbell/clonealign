@@ -54,7 +54,6 @@ Q_g <- function(pars, y, l, gamma, data) {
     m <- l[c] * data$s * mu # N length vector for given gene of means
     l_c <- dnbinom2(y, mu = m, size = phi) # p(y_g | pi)
     qq <- qq + sum(gamma[,c] * l_c )
-    # print(qq)
   }
   -qq
 }

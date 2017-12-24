@@ -8,7 +8,7 @@ author:
     - Department of Molecular Oncology, BC Cancer Agency
   email: kicampbell@bccrc.ca
 date: "January 2018"
-pacakge: clonealign
+package: clonealign
 output: 
   BiocStyle::html_document
 vignette: >
@@ -119,6 +119,8 @@ plotPCA(example_sce, ncomponents = 3, colour_by = "clone")
 The clone assignments in `clones` can then be used for the desired downstream analysis, such as differential expression or SNV analysis.
 
 # Advanced options
+
+TODO
 
 ## Controlling the EM algorithm
 
