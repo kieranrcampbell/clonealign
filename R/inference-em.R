@@ -11,13 +11,17 @@ likelihood_yn <- function(y, L, s_n, pi, params) {
 #' N by C matrix
 #'
 #' @importFrom matrixStats logSumExp
+#' @param data Input data
+#' @param params Model parameters
+#'
+#' @keywords internal
 p_pi <- function(data, params) {
   gamma <- matrix(NA, nrow = data$N, ncol = data$C)
   for(n in seq_len(data$N)) {
     for(c in seq_len(data$C)) {
       gamma[n,c] <- likelihood_yn(y = data$Y[n,],
                                   L = data$L,
-                                  s = data$s[n],
+                                  s_n = data$s[n],
                                   pi = c,
                                   params = params)
     }
@@ -27,6 +31,7 @@ p_pi <- function(data, params) {
 }
 
 #' @keywords internal
+#' @importFrom stats dnbinom
 dnbinom2 <- function(x, mu, size) {
   dnbinom(x, size = size, mu = mu, log = TRUE)
 }
@@ -34,6 +39,13 @@ dnbinom2 <- function(x, mu, size) {
 
 #' Computes Q(theta|theta^(t))
 #' (function to be optimised under EM)
+#' @keywords internal
+#'
+#' @param pars Parameters to optimise
+#' @param y Gene expression for gene
+#' @param l Copy number profiles for gene
+#' @param gamma Expectation of clone assignments at current EM step
+#' @param data Data used
 Q_g <- function(pars, y, l, gamma, data) {
   mu <- pars[1]
   phi <- pars[2]
@@ -48,7 +60,10 @@ Q_g <- function(pars, y, l, gamma, data) {
 }
 
 #' Computes map clone assignment given EM object
-#' @export
+#'
+#' @param em List returned by \code{inference_em}
+#' @return A vector of maximum likelihood clone assignments
+#' @keywords internal
 clone_assignment <- function(em) {
   apply(em$gamma, 1, which.max)
 }
@@ -81,11 +96,14 @@ log_likelihood <- function(params, data) {
 #' @param rel_tol Relative tolerance in percent below which the log-likelihood is considered converged
 #' @param gene_filter_threshold Genes with mean counts below or equal to this threshold will
 #' be filtered out (removes genes with no counts by default)
+#' @param verbose Logical - should convergence information be printed?
+#' @param bp_param Parameters for multithreaded optimization of Q function. See \code{?bpparam()}
 #'
 #' @importFrom glue glue
 #' @importFrom BiocParallel bplapply
+#' @importFrom stats optim
 #'
-#' @export
+#' @keywords internal
 inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
                           gene_filter_threshold = 0, verbose = TRUE,
                           bp_param = bpparam()) {
@@ -136,6 +154,8 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
 
   ll_old <- log_likelihood(params, data)
 
+  any_optim_errors <- FALSE
+
   for(i in seq_len(max_iter)) {
 
     # E step
@@ -153,8 +173,8 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
                    upper = c(max(data$Y), 1e6),
                    control = list())
       if(opt$convergence != 0) {
-        # TODO - deal with nonconvergence somehow
-        # print(opt$message)
+        warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
+        any_optim_errors <- TRUE
       }
       c(opt$par, -opt$value)
     }, BPPARAM = bp_param)
@@ -177,6 +197,10 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
       }
     }
     ll_old <- ll
+  }
+
+  if(any_optim_errors) {
+    message("There were errors in optimization of Q function. However, results may still be valid. See errors above.")
   }
 
   gamma <- p_pi(data, params)

@@ -22,8 +22,13 @@ inference_em(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-05,
 
 \item{gene_filter_threshold}{Genes with mean counts below or equal to this threshold will
 be filtered out (removes genes with no counts by default)}
+
+\item{verbose}{Logical - should convergence information be printed?}
+
+\item{bp_param}{Parameters for multithreaded optimization of Q function. See \code{?bpparam()}}
 }
 \description{
 Expectation-maximization for assigning scRNA-seq data
 to clone-of-origin
 }
+\keyword{internal}

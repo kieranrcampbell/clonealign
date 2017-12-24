@@ -6,6 +6,13 @@
 \usage{
 clone_assignment(em)
 }
+\arguments{
+\item{em}{List returned by \code{inference_em}}
+}
+\value{
+A vector of maximum likelihood clone assignments
+}
 \description{
 Computes map clone assignment given EM object
 }
+\keyword{internal}

@@ -7,7 +7,19 @@
 \usage{
 Q_g(pars, y, l, gamma, data)
 }
+\arguments{
+\item{pars}{Parameters to optimise}
+
+\item{y}{Gene expression for gene}
+
+\item{l}{Copy number profiles for gene}
+
+\item{gamma}{Expectation of clone assignments at current EM step}
+
+\item{data}{Data used}
+}
 \description{
 Computes Q(theta|theta^(t))
 (function to be optimised under EM)
 }
+\keyword{internal}

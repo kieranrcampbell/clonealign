@@ -10,14 +10,17 @@ clonealign(gene_expression_data, copy_number_data, size_factors = NULL,
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
-\code{SingleCellExperiment}. This should contain raw counts. See \link{details}.}
+\code{SingleCellExperiment}. This should contain raw counts. See \code{details}.}
 
-\item{copy_number_data}{A matrix of copy number calls for each clone or a \code{SummarizedExperiment}.
-See \link{details}.}
+\item{copy_number_data}{A matrix or data frame of copy number calls for each clone.
+See \code{details}.}
+
+\item{size_factors}{Vector of cell size factors. If NULL computed using
+\code{scran::computeSumFactors}}
 
 \item{max_iter}{Maximum number of EM iterations before algorithm is terminated}
 
-\item{rel_tol}{Relative tolerance (change in log-likelihood per EM iteration in percent) below which the 
+\item{rel_tol}{Relative tolerance (change in log-likelihood per EM iteration in percent) below which the
 EM algorithm is considered converged}
 
 \item{gene_filter_threshold}{Genes with mean counts below or equal to this threshold will
@@ -27,9 +30,6 @@ be filtered out (removes genes with no counts by default)}
 
 \item{bp_param}{Parameters for parallel optimization of the Q function during EM. Default parameters
 taken by call to \code{bpparam()}. See \code{?bpparam} for more details.}
-
-\item{s}{Vector of cell size factors. If NULL computed using
-\code{scran::computeSumFactors}}
 }
 \description{
 \code{clonealign} assigns single cells (measured with RNA-seq) to their clones of origin, where
@@ -37,16 +37,28 @@ the clones have been inferred from ultra-shallow scDNA-seq and collated into cop
 }
 \details{
 \strong{Input format}
-ABC
+
+\code{gene_expression_data} must either be a \code{SingleCellExperiment} or \code{SummarizedExperiment}
+with a \code{counts} assay
+representing raw gene expression counts, or a cell by gene matrix of raw counts.
+
+\code{copy_number_data} must either be a \code{matrix}, \code{data.frame} or \code{DataFrame} with a
+row for each gene in \code{gene_expression_data} and a column for each of the clones.
+If \code{colnames(copy_number_data)} is not \code{NULL} then these names will be used for each of
+the clones in the final output.
+
+\code{size_factors} should be a vector of size factors (one for each cell in \code{gene_expression_data}).
+If \code{NULL} these are computed using \code{scran::computeSumFactors}.
 
 \strong{EM convergence monitoring}
 
 \strong{Multithreaded optimization}
 }
 \examples{
+library(SingleCellExperiment)
 data(example_sce)
-cnv_data <- rowData(example_sce)[,c("A", "B", "C")]
-cal <- clonealign(example_sce, cnv_data)
+copy_number_data <- rowData(example_sce)[,c("A", "B", "C")]
+cal <- clonealign(example_sce, copy_number_data)
 print(cal)
 clones <- cal$clone
 }

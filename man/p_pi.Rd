@@ -7,7 +7,13 @@ N by C matrix}
 \usage{
 p_pi(data, params)
 }
+\arguments{
+\item{data}{Input data}
+
+\item{params}{Model parameters}
+}
 \description{
 Computes gamma_{nc} = p(pi_n = c), returning
 N by C matrix
 }
+\keyword{internal}

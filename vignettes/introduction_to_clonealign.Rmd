@@ -1,10 +1,14 @@
 ---
 title: "Introduction to clonealign"
+shorttitle: "Assigning single cell gene expression to clone-of-origin using clonealign"
 author: 
 - name: "Kieran R Campbell"
-  affiliation: University of British Columbia
+  affiliation: 
+    - Department of Statistics, University of British Columbia
+    - Department of Molecular Oncology, BC Cancer Agency
   email: kicampbell@bccrc.ca
 date: "January 2018"
+pacakge: clonealign
 output: 
   BiocStyle::html_document
 vignette: >
@@ -16,8 +20,14 @@ vignette: >
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>"
+  comment = "#>",
+  cache = TRUE
 )
+
+
+library(SingleCellExperiment)
+library(scater)
+
 ```
 
 
@@ -33,20 +43,88 @@ This is demonstrated in the figure below.
 
 <img src="clonealign_figure.png" width="600" align="middle" />
 
-Mathematically we have an $N \times G$ matrix $Y$ of raw gene expression counts (from RNA-seq) for $N$ cells and $G$ genes, where $y_{ng}$ is the counts to gene $g$ in cell $c$. We also have a $G \times C$ matrix $\Lambda$ of copy number variation, where $\lambda_{gc}$ is the copy number of gene $g$ in clone $c$. We introduce a clone-assigning categorical variable $\pi_n$ for each cell, where
+Mathematically we have an $N \times G$ matrix $Y$ of raw gene expression counts (from RNA-seq) for $N$ cells and $G$ genes, where $y_{ng}$ is the counts to gene $g$ in cell $c$. We also have a $G \times C$ matrix $\Lambda$ of copy number variation for $C$ clones, where $\lambda_{gc}$ is the copy number of gene $g$ in clone $c$. We introduce a clone-assigning categorical variable $\pi_n$ for each cell, where
 
 $$ \pi_n = c \text{ if cell $n$ on clone $c$} $$
 
-then `clonealign` models the expected counts in a gene and cell as
+then `clonealign` models the conditional expected counts in a gene and cell as
 
-$$ E[y_{ng}] = \frac{\lambda_{g,\pi_n}}{\frac{1}{N} \sum_{g'} \lambda_{g,\pi_n}} s_n \mu_g $$
+$$ E[y_{ng} | \pi_n] = \frac{\lambda_{g,\pi_n}}{\frac{1}{N} \sum_{g'} \lambda_{g,\pi_n}} s_n \mu_g $$
 
 where $s_n$ is a cell-specific size factor (calculated by default by `scran::computeSumFactors`) and $\mu_g$ is the "base" expression in an idealised monozygotic setting. The noise distribution is assumed to be negative-binomial. Inference is performed using expectation-maximization to find maximum likelihood estimates of the clone assignments $\pi_n$ and of all other model parameters.
  
 # Basic usage
 
+## Data preparation
+
+By default, `clonealign` requires two inputs:
+
+* Gene expression data as raw counts. This can be in the form of a `SingleCellExperiment`, `SummarizedExperiment` or **cell by gene** `matrix`
+* Copy number profiles for each clone and gene (where the genes **must** be the same as those measured in the expression data). This can be in the form of a `data.frame`, `DataFrame` or `matrix`
+
+Bundled with the package is an example `SingleCellExperiment` for 100 genes and 200 cells:
+
+```{r}
+library(clonealign)
+data(example_sce)
+example_sce
+```
+
+This has raw integer counts in the `assays` slot as required for input to `clonealign`:
+
+```{r}
+assay(example_sce, "counts")[1:5, 1:5]
+```
+
+
+The CNV data is stored in the `rowData` of the `SingleCellExperiment` for 3 clones (A, B, and C) and crucially the same genes as the expression data:
+
+```{r}
+cnv_data <- rowData(example_sce)[, c("A", "B", "C")]
+stopifnot(nrow(cnv_data) == nrow(example_sce)) # Make sure genes match up
+head(cnv_data)
+```
+
+
+
+## Model fitting
+
+The model is fitted with a basic call to `clonealign`, which prints the (relative change in) log-likelihood for each iteration (this can be turned off by setting `verbose = FALSE`):
+
+```{r}
+cal <- clonealign(example_sce, cnv_data)
+```
+
+```{r}
+print(cal)
+```
+
+
+The maximum likelihood estimates of the clone assignments can be access through the `clone` slot:
+
+```{r}
+clones <- cal$clone
+table(clones)
+```
+
+This can easily be added to the `SingleCellExperiment` for visualization with `scater`:
+
+```{r}
+library(scater)
+example_sce$clone <- clones
+example_sce <- normaliseExprs(example_sce)
+plotPCA(example_sce, ncomponents = 3, colour_by = "clone")
+```
+
+The clone assignments in `clones` can then be used for the desired downstream analysis, such as differential expression or SNV analysis.
 
 # Advanced options
+
+## Controlling the EM algorithm
+
+## Multithreaded options
+
+## Accessing maximum-likelihood parameter estimates
 
 
 # Technical
