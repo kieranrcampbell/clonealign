@@ -19,13 +19,26 @@ install_github("kieranrcampbell/clonealign")
 
 ### Usage
 
-TODO
-
-If `Y` is a cell-by-gene matrix of raw counts and `L` is a gene-by-clone matrix of copy number, then
+`clonealign` accepts either a cell-by-gene matrix of raw counts or a [SingleCellExperiment](https://bioconductor.org/packages/3.7/bioc/html/SingleCellExperiment.html) with a `counts` assay as gene expression input. It also requires a gene-by-clone matrix or `data.frame` corresponding to the copy number of each gene in each clone. The cells are then assigned to their clones by calling
 
 ```r
-clonealign(Y, L)
+cal <- clonealign(gene_expression_data, # matrix or SingleCellExperiment
+                  copy_number_data)     # matrix or data.frame
+print(cal)
 ```
+```
+A clonealign_fit for 200 cells, 100 genes, and 3 clones
+To access clone assignments, call x$clone
+To access ML parameter estimates, call x$ml_params
+```
+
+```r
+print(head(cal$clone))
+```
+```
+[1] "B" "C" "C" "B" "C" "B"
+```
+
 
 ## Paper
 
