@@ -65,10 +65,10 @@ The maximum number of iterations to acheive this is set using the \code{max_iter
 
 \strong{Multithreaded optimization}
 
-The M-step of the EM algorithm consists of \eqn{G} different optimizations for \eqn{G} parameters. These optimizations
-are performed in parallel using the \code{BiocParallel} package. The control over the parallel
+The M-step of the EM algorithm consists of \eqn{G} different optimizations for \eqn{G} genes. These optimizations
+are performed in parallel using the \code{BiocParallel} package. The parallel
 computations are controlled using the \code{bp_param} argument. For fine control over this see
-the \code{\link[BiocParallel]{bpparam}} function. By default \code{clonealign} uses the default parameters
+the \code{\link[BiocParallel]{bpparam}} function. By default \code{clonealign} uses the parameters
 that are returned by a call to \code{bpparam()}. To use only e.g. 1 core call \code{clonealign} with
 \code{clonealign(..., bp_param = MulticoreParam(workers = 1))}.
 }

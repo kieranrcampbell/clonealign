@@ -18,6 +18,9 @@ Q_g(pars, y, l, gamma, data)
 
 \item{data}{Data used}
 }
+\value{
+The g'th term in the expected complete data log likelihood
+}
 \description{
 Computes Q(theta|theta^(t))
 (function to be optimised under EM)

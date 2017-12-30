@@ -120,13 +120,37 @@ The clone assignments in `clones` can then be used for the desired downstream an
 
 # Advanced options
 
-TODO
 
 ## Controlling the EM algorithm
 
+Inference is performed using the [EM algorithm](https://en.wikipedia.org/wiki/Expectation-maximization_algorithm)
+which uses the log marginal likelihood to monitor convergence. This is controlled using the
+`rel_tol` parameter. When the difference 
+
+$$ \Delta L = \frac{L_{\text{new}} - L_{\text{old}}}{|L_{\text{old}}|} $$
+falls below `rel_tol`, the EM algorithm is considered converged.
+The maximum number of iterations to acheive this is set using the `max_iter` parameter.
+
 ## Multithreaded options
 
+The M-step of the EM algorithm consists of $G$ different optimizations for $G$ genes. These optimizations are performed in parallel using the BiocParallel package. The parallel computations are controlled using the `bp_param` argument. For fine control over this see the `bpparam` function. By default clonealign uses the parameters that are returned by a call to `bpparam()`. To use only e.g. 1 core call `clonealign` with `clonealign(..., bp_param = MulticoreParam(workers = 1))`.
+
 ## Accessing maximum-likelihood parameter estimates
+
+The object returned by a call to `clonealign` contains a `clone` slot for the maximum likelihood (ML) clone assignment for each cell. The ML estimates of the other parameters can be found in the `cal$ml_params` slot:
+
+```{r}
+names(cal$ml_params)
+```
+
+The slot `clone_probs` gives the probability that each cell is assigned to each clone:
+
+```{r}
+head(cal$ml_params$clone_probs)
+```
+
+while `mu` and `phi` give the maximum likelihood estimates of the $\mu$ and $\phi$ parameters from the model.
+
 
 
 # Technical

@@ -12,6 +12,9 @@ p_pi(data, params)
 
 \item{params}{Model parameters}
 }
+\value{
+The probability that each cell belongs to each clone, as a matrix
+}
 \description{
 Computes gamma_{nc} = p(pi_n = c), returning
 N by C matrix

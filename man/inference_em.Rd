@@ -27,6 +27,9 @@ be filtered out (removes genes with no counts by default)}
 
 \item{bp_param}{Parameters for multithreaded optimization of Q function. See \code{?bpparam()}}
 }
+\value{
+A list with ML estimates for each of the model parameters
+}
 \description{
 Expectation-maximization for assigning scRNA-seq data
 to clone-of-origin

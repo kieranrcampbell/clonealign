@@ -15,6 +15,8 @@ likelihood_yn <- function(y, L, s_n, pi, params) {
 #' @param params Model parameters
 #'
 #' @keywords internal
+#'
+#' @return The probability that each cell belongs to each clone, as a matrix
 p_pi <- function(data, params) {
   gamma <- matrix(NA, nrow = data$N, ncol = data$C)
   for(n in seq_len(data$N)) {
@@ -46,6 +48,8 @@ dnbinom2 <- function(x, mu, size) {
 #' @param l Copy number profiles for gene
 #' @param gamma Expectation of clone assignments at current EM step
 #' @param data Data used
+#'
+#' @return The g'th term in the expected complete data log likelihood
 Q_g <- function(pars, y, l, gamma, data) {
   mu <- pars[1]
   phi <- pars[2]
@@ -103,6 +107,8 @@ log_likelihood <- function(params, data) {
 #' @importFrom stats optim
 #'
 #' @keywords internal
+#'
+#' @return A list with ML estimates for each of the model parameters
 inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
                           gene_filter_threshold = 0, verbose = TRUE,
                           bp_param = bpparam()) {
