@@ -39,11 +39,20 @@
 #'
 #' \strong{EM convergence monitoring}
 #'
-#' TODO
+#' Inference is performed using the EM algorithm (\url{https://en.wikipedia.org/wiki/Expectation-maximization_algorithm})
+#' which uses the log marginal likelihood to monitor convergence. This is controlled using the
+#' \code{rel_tol} parameter. When the difference between the new and old log marginal likelihoods normalized
+#' by the absolute value of the old falls below \code{rel_tol}, the EM algorithm is considered converged.
+#' The maximum number of iterations to acheive this is set using the \code{max_iter} parameter.
 #'
 #' \strong{Multithreaded optimization}
 #'
-#' TODO
+#' The M-step of the EM algorithm consists of \eqn{G} different optimizations for \eqn{G} parameters. These optimizations
+#' are performed in parallel using the \code{BiocParallel} package. The control over the parallel
+#' computations are controlled using the \code{bp_param} argument. For fine control over this see
+#' the \code{\link[BiocParallel]{bpparam}} function. By default \code{clonealign} uses the default parameters
+#' that are returned by a call to \code{bpparam()}. To use only e.g. 1 core call \code{clonealign} with
+#' \code{clonealign(..., bp_param = MulticoreParam(workers = 1))}.
 #'
 #' @return An object of class \code{clonealign_fit}. The maximum likelihood estimates of the
 #' clone assignment paramters are in the \code{clone} slot. Maximum likelihood estimates of
