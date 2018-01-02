@@ -123,6 +123,8 @@ clonealign <- function(gene_expression_data,
     stop("copy_number_data must have same number of genes (rows) as gene_expression_data")
   }
 
+  C <- ncol(L)
+
   # Sanity checking done - time to call em algorithm
   em <- inference_em(
     Y,
@@ -151,7 +153,7 @@ clonealign <- function(gene_expression_data,
   clone_names <- colnames(L)
   if(!is.null(L)) {
     rlist$clone <- plyr::mapvalues(rlist$clone,
-                                   from = sort(unique(rlist$clone)),
+                                   from = seq_len(C),
                                    to = clone_names)
     colnames(rlist$ml_params$clone_probs) <- clone_names
   }
