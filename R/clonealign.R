@@ -91,7 +91,7 @@ clonealign <- function(gene_expression_data,
     if(!("counts" %in% assay_names)) {
       stop(paste("counts not in assays(gene_expression_data). Available assays:", paste(assay_names, collapse = ",")))
     }
-    Y <- t(assay(gene_expression_data, "counts"))
+    Y <- t(as.matrix(assay(gene_expression_data, "counts")))
   } else if(is(gene_expression_data, "matrix")) {
     Y <- gene_expression_data
   } else {
