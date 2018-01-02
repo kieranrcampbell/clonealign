@@ -6,7 +6,8 @@
 to clone-of-origin}
 \usage{
 inference_em(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-05,
-  gene_filter_threshold = 0, verbose = TRUE, bp_param = bpparam())
+  gene_filter_threshold = 0, verbose = TRUE, multithread = TRUE,
+  bp_param = bpparam())
 }
 \arguments{
 \item{Y}{cell-by-gene expression matrix of raw counts}
@@ -24,6 +25,8 @@ inference_em(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-05,
 be filtered out (removes genes with no counts by default)}
 
 \item{verbose}{Logical - should convergence information be printed?}
+
+\item{multithread}{Should the M-step be performed in parallel using \code{BiocParallel}? Default \code{TRUE}}
 
 \item{bp_param}{Parameters for multithreaded optimization of Q function. See \code{?bpparam()}}
 }

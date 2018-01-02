@@ -17,6 +17,7 @@
 #' @param gene_filter_threshold Genes with mean counts below or equal to this threshold will
 #' be filtered out (removes genes with no counts by default)
 #' @param verbose Should warnings and EM convergence information be printed? Default TRUE
+#' @param multithread Should the M-step be performed in parallel using \code{BiocParallel}? Default \code{TRUE}
 #' @param bp_param Parameters for parallel optimization of the Q function during EM. Default parameters
 #' taken by call to \code{bpparam()}. See \code{?bpparam} for more details.
 #'
@@ -77,6 +78,7 @@ clonealign <- function(gene_expression_data,
                        rel_tol = 1e-5,
                        gene_filter_threshold = 0,
                        verbose = TRUE,
+                       multithread = TRUE,
                        bp_param = bpparam()) {
 
   N <- NA # Number of cells
@@ -134,6 +136,7 @@ clonealign <- function(gene_expression_data,
     rel_tol,
     gene_filter_threshold,
     verbose,
+    multithread,
     bp_param
   )
 

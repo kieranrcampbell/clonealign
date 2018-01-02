@@ -100,6 +100,7 @@ log_likelihood <- function(params, data) {
 #' @param gene_filter_threshold Genes with mean counts below or equal to this threshold will
 #' be filtered out (removes genes with no counts by default)
 #' @param verbose Logical - should convergence information be printed?
+#' @param multithread Should the M-step be performed in parallel using \code{BiocParallel}? Default \code{TRUE}
 #' @param bp_param Parameters for multithreaded optimization of Q function. See \code{?bpparam()}
 #'
 #' @importFrom glue glue
@@ -111,6 +112,7 @@ log_likelihood <- function(params, data) {
 #' @return A list with ML estimates for each of the model parameters
 inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
                           gene_filter_threshold = 0, verbose = TRUE,
+                          multithread = TRUE,
                           bp_param = bpparam()) {
 
   zero_gene_means <- colMeans(Y) <= gene_filter_threshold
@@ -167,22 +169,40 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     gamma <- p_pi(data, params)
 
     # M step
+    if(multithread) {
+      pnew <- bplapply(seq_len(data$G), function(g) {
+        opt <- optim(par = params[g,], # (mu,phi)
+                     fn = Q_g,
+                     # gr = grad_g,
+                     y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
+                     method = "L-BFGS-B",
+                     lower = c(1e-10, 1e-10),
+                     upper = c(max(data$Y), 1e6),
+                     control = list())
+        if(opt$convergence != 0) {
+          warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
+          any_optim_errors <- TRUE
+        }
+        c(opt$par, -opt$value)
+      }, BPPARAM = bp_param)
+    } else {
+      pnew <- lapply(seq_len(data$G), function(g) {
+        opt <- optim(par = params[g,], # (mu,phi)
+                     fn = Q_g,
+                     # gr = grad_g,
+                     y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
+                     method = "L-BFGS-B",
+                     lower = c(1e-10, 1e-10),
+                     upper = c(max(data$Y), 1e6),
+                     control = list())
+        if(opt$convergence != 0) {
+          warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
+          any_optim_errors <- TRUE
+        }
+        c(opt$par, -opt$value)
+      })
+    }
 
-    pnew <- bplapply(seq_len(data$G), function(g) {
-      opt <- optim(par = params[g,], # (mu,phi)
-                   fn = Q_g,
-                   # gr = grad_g,
-                   y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
-                   method = "L-BFGS-B",
-                   lower = c(1e-10, 1e-10),
-                   upper = c(max(data$Y), 1e6),
-                   control = list())
-      if(opt$convergence != 0) {
-        warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
-        any_optim_errors <- TRUE
-      }
-      c(opt$par, -opt$value)
-    }, BPPARAM = bp_param)
     pnew <- do.call(rbind, pnew)
     params <- pnew[,c('mu', 'phi')]
     ll <- log_likelihood(params, data)
