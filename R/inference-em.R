@@ -1,9 +1,16 @@
 
 #' @keywords internal
-likelihood_yn <- function(y, L, s_n, pi, params) {
-  m <- L[, pi] * s_n * params[, 'mu']
+likelihood_yn <- function(data, n, pi, params, delta) {
+  y <- data$Y[n,]
+  L <- data$L
+  s_n <- data$s[n]
+  # TODO make this more efficient
+  fl <- data$f(L[,pi], delta)
+  fl <- fl / sum(fl)
+
+  m <- fl * s_n * params[, 'mu']
+
   phi <- params[, 'phi']
-  # m[m == 0] <- 0.1
   ll <- sum(dnbinom2(y, mu = m, size = phi))
   ll
 }
@@ -18,15 +25,15 @@ likelihood_yn <- function(y, L, s_n, pi, params) {
 #' @keywords internal
 #'
 #' @return The probability that each cell belongs to each clone, as a matrix
-p_pi <- function(data, params) {
+p_pi <- function(data, params, delta) {
   gamma <- matrix(NA, nrow = data$N, ncol = data$C)
   for(n in seq_len(data$N)) {
     for(c in seq_len(data$C)) {
-      gamma[n,c] <- likelihood_yn(y = data$Y[n,],
-                                  L = data$L,
-                                  s_n = data$s[n],
+      gamma[n,c] <- likelihood_yn(data,
+                                  n = n,
                                   pi = c,
-                                  params = params)
+                                  params = params,
+                                  delta = delta)
     }
     gamma[n,] <- exp(gamma[n,] - logSumExp(gamma[n,]))
   }
@@ -54,14 +61,31 @@ dnbinom2 <- function(x, mu, size) {
 Q_g <- function(pars, y, l, gamma, data) {
   mu <- pars[1]
   phi <- pars[2]
+  delta <- pars[3]
   qq <- 0
   for(c in seq_len(data$C)) {
     m <- l[c] * data$s * mu # N length vector for given gene of means
-    # m[m == 0] <- 1
     l_c <- dnbinom2(y, mu = m, size = phi) # p(y_g | pi)
     qq <- qq + sum(gamma[,c] * l_c )
   }
   -qq
+}
+
+#' @keywords internal
+Q <- function(delta, params, data, gamma) {
+  ll <- 0
+  mu <- params[,'mu']
+  phi <- params[,'phi']
+
+  L <- data$fl(data$L, delta)
+
+  for(n in seq_len(data$N)) {
+    pnc <- sapply(seq_len(data$C), function(c) {
+      sum(gamma[n,c] * dnbinom2(data$Y[n,], mu * L[,c] * data$s[n], size = phi))
+    })
+    ll <- ll + logSumExp(pnc)
+  }
+  -ll
 }
 
 #' Computes map clone assignment given EM object
@@ -76,14 +100,16 @@ clone_assignment <- function(em) {
 
 
 #' @keywords internal
-log_likelihood <- function(params, data) {
+log_likelihood <- function(params, data, delta) {
   ll <- 0
   mu <- params[,'mu']
   phi <- params[,'phi']
 
+  L <- data$fl(data$L, delta)
+
   for(n in seq_len(data$N)) {
     pnc <- sapply(seq_len(data$C), function(c) {
-     sum(dnbinom2(data$Y[n,], mu * data$L[,c] * data$s[n], size = phi))
+     sum(dnbinom2(data$Y[n,], mu * L[,c] * data$s[n], size = phi))
     })
     ll <- ll + logSumExp(pnc)
    }
@@ -143,7 +169,7 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
 
 
   # Always normalise L
-  L <- t( t(L) / colMeans(L) )
+  # L <- t( t(L) / colMeans(L) )
 
   # Initialise
   params <- cbind(
@@ -158,27 +184,38 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     s = s,
     N = N,
     G = G,
-    C = C
+    C = C,
+    f = function(x, delta) delta * x + 2 * (1 - delta),
+    fl = function(L, delta) {
+      apply(L, 2, function(l) {
+        ffl <- data$f(l, delta)
+        ffl / mean(ffl)
+      })
+    }
   )
+
+  delta <- 1
 
   data$L[data$L == 0] <- 1
 
-  ll_old <- log_likelihood(params, data)
+  ll_old <- log_likelihood(params, data, delta)
 
   any_optim_errors <- FALSE
 
   for(i in seq_len(max_iter)) {
 
     # E step
-    gamma <- p_pi(data, params)
+    gamma <- p_pi(data, params, delta)
 
+
+    Lf <- data$fl(data$L, delta)
     # M step
     if(multithread) {
       pnew <- bplapply(seq_len(data$G), function(g) {
         opt <- optim(par = params[g,], # (mu,phi)
                      fn = Q_g,
                      # gr = grad_g,
-                     y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
+                     y = data$Y[,g], l = Lf[g,], gamma = gamma, data = data,
                      method = "L-BFGS-B",
                      lower = c(1e-10, 1e-10),
                      upper = c(max(data$Y), 1e6),
@@ -209,7 +246,20 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
 
     pnew <- do.call(rbind, pnew)
     params <- pnew[,c('mu', 'phi')]
-    ll <- log_likelihood(params, data)
+    ll <- log_likelihood(params, data, delta)
+
+    opt_delta <- optim(
+      delta,
+      params = params, data = data, gamma = gamma,
+      fn = Q,
+      lower = 0.1,
+      upper = 1.99,
+      method = "L-BFGS-B"
+    )
+    delta <- opt_delta$par
+
+    ll <- log_likelihood(params, data, delta)
+
 
     ll_diff <- (ll - ll_old)  / abs(ll_old) * 100
 
