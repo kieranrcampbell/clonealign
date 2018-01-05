@@ -3,6 +3,7 @@
 likelihood_yn <- function(y, L, s_n, pi, params) {
   m <- L[, pi] * s_n * params[, 'mu']
   phi <- params[, 'phi']
+  # m[m == 0] <- 0.1
   ll <- sum(dnbinom2(y, mu = m, size = phi))
   ll
 }
@@ -56,6 +57,7 @@ Q_g <- function(pars, y, l, gamma, data) {
   qq <- 0
   for(c in seq_len(data$C)) {
     m <- l[c] * data$s * mu # N length vector for given gene of means
+    # m[m == 0] <- 1
     l_c <- dnbinom2(y, mu = m, size = phi) # p(y_g | pi)
     qq <- qq + sum(gamma[,c] * l_c )
   }
@@ -158,6 +160,8 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     G = G,
     C = C
   )
+
+  data$L[data$L == 0] <- 1
 
   ll_old <- log_likelihood(params, data)
 
