@@ -1,9 +1,9 @@
 
 #' @keywords internal
-likelihood_yn <- function(y, L, s_n, pi, params) {
-  m <- L[, pi] * s_n * params[, 'mu']
+likelihood_yn <- function(y, L, S_n, pi, params) {
+  m <- L[, pi] * params[, 'mu'] # TODO - calculation of this can be moved outside the loop
+  m <- m / sum(m) * S_n
   phi <- params[, 'phi']
-  # m[m == 0] <- 0.1
   ll <- sum(dnbinom2(y, mu = m, size = phi))
   ll
 }
@@ -24,7 +24,7 @@ p_pi <- function(data, params) {
     for(c in seq_len(data$C)) {
       gamma[n,c] <- likelihood_yn(y = data$Y[n,],
                                   L = data$L,
-                                  s_n = data$s[n],
+                                  S_n = data$S[n],
                                   pi = c,
                                   params = params)
     }
@@ -64,6 +64,22 @@ Q_g <- function(pars, y, l, gamma, data) {
   -qq
 }
 
+Q <- function(pars, data, gamma) {
+  G <- data$G
+  mu <- c(1, pars[seq_len(G-1)])
+  phi <- pars[seq(G, 2*G-1)]
+  qq <- 0
+  for(n in 1:data$N) {
+    for(c in 1:data$C) {
+      m <- data$L[,c] * mu
+      m <- m / sum(m) * data$S[n]
+      l_c <- dnbinom2(data$Y[n,], mu = m, size = phi)
+      qq <- qq + gamma[n,c] * sum(l_c)
+    }
+  }
+  -qq
+}
+
 #' Computes map clone assignment given EM object
 #'
 #' @param em List returned by \code{inference_em}
@@ -81,12 +97,13 @@ log_likelihood <- function(params, data) {
   mu <- params[,'mu']
   phi <- params[,'phi']
 
-  for(n in seq_len(data$N)) {
-    pnc <- sapply(seq_len(data$C), function(c) {
-     sum(dnbinom2(data$Y[n,], mu * data$L[,c] * data$s[n], size = phi))
-    })
-    ll <- ll + logSumExp(pnc)
-   }
+  for(n in 1:data$N) {
+    for(c in 1:data$C) {
+      m <- data$L[,c] * mu
+      m <- m / sum(m) * data$S[n]
+      ll <- ll + sum(dnbinom2(data$Y[n,], mu = m, size = phi))
+    }
+  }
   ll
 }
 
@@ -112,7 +129,7 @@ log_likelihood <- function(params, data) {
 #' @keywords internal
 #'
 #' @return A list with ML estimates for each of the model parameters
-inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
+inference_em <- function(Y, L, S = NULL, max_iter = 100, rel_tol = 1e-5,
                           gene_filter_threshold = 0, verbose = TRUE,
                           multithread = TRUE,
                           bp_param = bpparam()) {
@@ -135,27 +152,28 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
   stopifnot(nrow(L) == G)
 
 
-  if(is.null(s)) {
-    s <- scran::computeSumFactors(t(Y))
+  if(is.null(S)) {
+    S = rowSums(Y)
   }
-  stopifnot(length(s) == N)
+  stopifnot(length(S) == N)
   stopifnot(all(s > 0))
 
 
-  # Always normalise L
-  L <- t( t(L) / colMeans(L) )
-
   # Initialise
   params <- cbind(
-    colMeans(Y / s) + 0.01,
+    colMeans(Y / S) + 0.01, # TODO - how to initialise mu ?
     rep(1, G)
   )
+
+  params[-1,1] <- params[-1,1] / params[1,1]
+  params[1,1] <- 1
+
   colnames(params) <- c("mu", "phi")
 
   data <- list(
     Y = Y,
     L = L,
-    s = s,
+    S = S,
     N = N,
     G = G,
     C = C
@@ -172,43 +190,32 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     # E step
     gamma <- p_pi(data, params)
 
-    # M step
-    if(multithread) {
-      pnew <- bplapply(seq_len(data$G), function(g) {
-        opt <- optim(par = params[g,], # (mu,phi)
-                     fn = Q_g,
-                     # gr = grad_g,
-                     y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
-                     method = "L-BFGS-B",
-                     lower = c(1e-10, 1e-10),
-                     upper = c(max(data$Y), 1e6),
-                     control = list())
-        if(opt$convergence != 0) {
-          warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
-          any_optim_errors <- TRUE
-        }
-        c(opt$par, -opt$value)
-      }, BPPARAM = bp_param)
-    } else {
-      pnew <- lapply(seq_len(data$G), function(g) {
-        opt <- optim(par = params[g,], # (mu,phi)
-                     fn = Q_g,
-                     # gr = grad_g,
-                     y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
-                     method = "L-BFGS-B",
-                     lower = c(1e-10, 1e-10),
-                     upper = c(max(data$Y), 1e6),
-                     control = list())
-        if(opt$convergence != 0) {
-          warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
-          any_optim_errors <- TRUE
-        }
-        c(opt$par, -opt$value)
-      })
-    }
+    # TODO delete
+    # sourceCpp("../clonealign/Q.cpp")
+    # system.time(Qcpp(par, gamma, data$Y, data$L, data$S))
+    # system.time(Q(par, data = data, gamma = gamma))
+    # Q(par, data = data, gamma = gamma)
+    # Qcpp(par, gamma, data$Y, data$L, data$S)
 
-    pnew <- do.call(rbind, pnew)
-    params <- pnew[,c('mu', 'phi')]
+    # M step
+    par <- c(params[-1,1], params[,2]) # oh isn't this fun
+    opt <- optim(par = par, # (mu[-1],phi)
+                 fn = Qcpp,
+                 gamma = gamma, Y = data$Y, L = data$L, S = data$S,
+                 method = "L-BFGS-B",
+                 lower = rep(1e-6, length(par)),
+                 # upper = rep(1e6, length(par)),
+                 control = list())
+
+    s <- spg(par = par, # (mu[-1],phi)
+             fn = Qcpp,
+             gamma = gamma, Y = data$Y, L = data$L, S = data$S,
+             lower = rep(1e-6, length(par)))
+
+    params[,1] <- c(1, opt$par[1:(G-1)])
+    params[,2] <- opt$par[G:(2*G-1)]
+
+
     ll <- log_likelihood(params, data)
 
     ll_diff <- (ll - ll_old)  / abs(ll_old) * 100
