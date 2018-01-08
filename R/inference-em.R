@@ -1,7 +1,7 @@
 
 #' @keywords internal
 likelihood_yn <- function(y, L, s_n, pi, params) {
-  m <- L[, pi] * s_n * params[, 'mu']
+  m <- params[, 'mu'] * (1 + params[,'beta'] * L[, pi]) * s_n
   phi <- params[, 'phi']
   # m[m == 0] <- 0.1
   ll <- sum(dnbinom2(y, mu = m, size = phi))
@@ -53,11 +53,11 @@ dnbinom2 <- function(x, mu, size) {
 #' @return The g'th term in the expected complete data log likelihood
 Q_g <- function(pars, y, l, gamma, data) {
   mu <- pars[1]
-  phi <- pars[2]
+  beta <- pars[2]
+  phi <- pars[3]
   qq <- 0
   for(c in seq_len(data$C)) {
-    m <- l[c] * data$s * mu # N length vector for given gene of means
-    # m[m == 0] <- 1
+    m <- mu * (1 + beta * l[c]) * data$s # N length vector for given gene of means
     l_c <- dnbinom2(y, mu = m, size = phi) # p(y_g | pi)
     qq <- qq + sum(gamma[,c] * l_c )
   }
@@ -79,11 +79,13 @@ clone_assignment <- function(em) {
 log_likelihood <- function(params, data) {
   ll <- 0
   mu <- params[,'mu']
+  beta <- params[,'beta']
   phi <- params[,'phi']
 
   for(n in seq_len(data$N)) {
     pnc <- sapply(seq_len(data$C), function(c) {
-     sum(dnbinom2(data$Y[n,], mu * data$L[,c] * data$s[n], size = phi))
+      m <- mu * (1 + beta * data$L[,c]) * data$s[n]
+      sum(dnbinom2(data$Y[n,], m, size = phi))
     })
     ll <- ll + logSumExp(pnc)
    }
@@ -148,9 +150,10 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
   # Initialise
   params <- cbind(
     colMeans(Y / s) + 0.01,
+    rep(0.5, G),
     rep(1, G)
   )
-  colnames(params) <- c("mu", "phi")
+  colnames(params) <- c("mu", "beta", "phi")
 
   data <- list(
     Y = Y,
@@ -177,11 +180,10 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
       pnew <- bplapply(seq_len(data$G), function(g) {
         opt <- optim(par = params[g,], # (mu,phi)
                      fn = Q_g,
-                     # gr = grad_g,
                      y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
                      method = "L-BFGS-B",
-                     lower = c(1e-10, 1e-10),
-                     upper = c(max(data$Y), 1e6),
+                     lower = c(1e-10, 1e-10, 1e-10),
+                     upper = c(max(data$Y), 1e6, 1e6),
                      control = list())
         if(opt$convergence != 0) {
           warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
@@ -196,8 +198,8 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
                      # gr = grad_g,
                      y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
                      method = "L-BFGS-B",
-                     lower = c(1e-10, 1e-10),
-                     upper = c(max(data$Y), 1e6),
+                     lower = c(1e-10, 1e-10, 1e-10),
+                     upper = c(max(data$Y), 1e6, 1e6),
                      control = list())
         if(opt$convergence != 0) {
           warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
@@ -208,7 +210,7 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     }
 
     pnew <- do.call(rbind, pnew)
-    params <- pnew[,c('mu', 'phi')]
+    params <- pnew[,c('mu', 'beta', 'phi')]
     ll <- log_likelihood(params, data)
 
     ll_diff <- (ll - ll_old)  / abs(ll_old) * 100
@@ -236,6 +238,7 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
   rlist <- list(
     gamma = gamma,
     mu = params[, 'mu'],
+    beta = params[, 'beta'],
     phi = params[, 'phi']
   )
 

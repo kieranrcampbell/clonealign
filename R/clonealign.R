@@ -147,6 +147,7 @@ clonealign <- function(gene_expression_data,
   ml_params <- list(
     clone_probs = em$gamma,
     mu = em$mu,
+    beta = em$beta,
     phi = em$phi
   )
 
