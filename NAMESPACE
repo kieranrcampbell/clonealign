@@ -2,6 +2,8 @@
 
 S3method(print,clonealign_fit)
 export(clonealign)
+export(inference_tflow)
+import(tensorflow)
 importFrom(BiocParallel,bplapply)
 importFrom(BiocParallel,bpparam)
 importFrom(SummarizedExperiment,assay)
