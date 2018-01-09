@@ -4,10 +4,10 @@
 \alias{clone_assignment}
 \title{Computes map clone assignment given EM object}
 \usage{
-clone_assignment(em)
+clone_assignment(tflow_res)
 }
 \arguments{
-\item{em}{List returned by \code{inference_em}}
+\item{tflow_res}{List returned by \code{inference_tflow}}
 }
 \value{
 A vector of maximum likelihood clone assignments

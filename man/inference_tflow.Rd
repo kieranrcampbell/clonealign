@@ -4,9 +4,9 @@
 \alias{inference_tflow}
 \title{EM inference with tensorflow}
 \usage{
-inference_tflow(Y_dat, L_dat, max_iter = 100, rel_tol = 1e-05,
-  gene_filter_threshold = 0, verbose = TRUE, multithread = TRUE,
-  bp_param = bpparam())
+inference_tflow(Y_dat, L_dat, max_em_iter = 100, rel_em_tol = 1e-05,
+  max_adam_iter = 100, rel_adam_tol = 1e-05, gene_filter_threshold = 0,
+  verbose = TRUE)
 }
 \description{
 EM inference with tensorflow

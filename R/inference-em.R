@@ -66,11 +66,11 @@ Q_g <- function(pars, y, l, gamma, data) {
 
 #' Computes map clone assignment given EM object
 #'
-#' @param em List returned by \code{inference_em}
+#' @param tflow_res List returned by \code{inference_tflow}
 #' @return A vector of maximum likelihood clone assignments
 #' @keywords internal
-clone_assignment <- function(em) {
-  apply(em$gamma, 1, which.max)
+clone_assignment <- function(tflow_res) {
+  apply(tflow_res$gamma, 1, which.max)
 }
 
 
@@ -92,170 +92,18 @@ log_likelihood <- function(params, data) {
   ll
 }
 
-#' Expectation-maximization for assigning scRNA-seq data
-#' to clone-of-origin
-#'
-#' @param Y cell-by-gene expression matrix of raw counts
-#' @param L gene-by-clone matrix of copy number variation
-#' @param s Vector of cell size factors. If NULL computed using
-#' \code{scran::computeSumFactors}
-#' @param max_iter Maximum number of EM iterations before algorithm is terminated
-#' @param rel_tol Relative tolerance in percent below which the log-likelihood is considered converged
-#' @param gene_filter_threshold Genes with mean counts below or equal to this threshold will
-#' be filtered out (removes genes with no counts by default)
-#' @param verbose Logical - should convergence information be printed?
-#' @param multithread Should the M-step be performed in parallel using \code{BiocParallel}? Default \code{TRUE}
-#' @param bp_param Parameters for multithreaded optimization of Q function. See \code{?bpparam()}
-#'
-#' @importFrom glue glue
-#' @importFrom BiocParallel bplapply
-#' @importFrom stats optim
-#'
-#' @keywords internal
-#'
-#' @return A list with ML estimates for each of the model parameters
-inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
-                          gene_filter_threshold = 0, verbose = TRUE,
-                          multithread = TRUE,
-                          bp_param = bpparam()) {
-
-  zero_gene_means <- colMeans(Y) <= gene_filter_threshold
-
-  if(verbose) {
-    message(glue("Removing {sum(zero_gene_means)} genes with low counts"))
-  }
-
-  Y <- Y[, !zero_gene_means]
-  L <- L[!zero_gene_means,]
-
-
-  N <- nrow(Y)
-  G <- ncol(Y)
-  C <- ncol(L)
-
-  # Sanity checks
-  stopifnot(nrow(L) == G)
-
-
-  if(is.null(s)) {
-    s <- scran::computeSumFactors(t(Y))
-  }
-  stopifnot(length(s) == N)
-  stopifnot(all(s > 0))
-
-
-  # Always normalise L
-  L <- t( t(L) / colMeans(L) )
-
-  # Initialise
-  params <- cbind(
-    colMeans(Y / s) + 0.01,
-    rep(0.5, G),
-    rep(1, G)
-  )
-  colnames(params) <- c("mu", "beta", "phi")
-
-  data <- list(
-    Y = Y,
-    L = L,
-    s = s,
-    N = N,
-    G = G,
-    C = C
-  )
-
-  data$L[data$L == 0] <- 1
-
-  ll_old <- log_likelihood(params, data)
-
-  any_optim_errors <- FALSE
-
-  for(i in seq_len(max_iter)) {
-
-    # E step
-    gamma <- p_pi(data, params)
-
-    # M step
-    if(multithread) {
-      pnew <- bplapply(seq_len(data$G), function(g) {
-        opt <- optim(par = params[g,], # (mu,phi)
-                     fn = Q_g,
-                     y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
-                     method = "L-BFGS-B",
-                     lower = c(1e-10, 1e-10, 1e-10),
-                     upper = c(max(data$Y), 1e6, 1e6),
-                     control = list())
-        if(opt$convergence != 0) {
-          warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
-          any_optim_errors <- TRUE
-        }
-        c(opt$par, -opt$value)
-      }, BPPARAM = bp_param)
-    } else {
-      pnew <- lapply(seq_len(data$G), function(g) {
-        opt <- optim(par = params[g,], # (mu,phi)
-                     fn = Q_g,
-                     # gr = grad_g,
-                     y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
-                     method = "L-BFGS-B",
-                     lower = c(1e-10, 1e-10, 1e-10),
-                     upper = c(max(data$Y), 1e6, 1e6),
-                     control = list())
-        if(opt$convergence != 0) {
-          warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
-          any_optim_errors <- TRUE
-        }
-        c(opt$par, -opt$value)
-      })
-    }
-
-    pnew <- do.call(rbind, pnew)
-    params <- pnew[,c('mu', 'beta', 'phi')]
-    ll <- log_likelihood(params, data)
-
-    ll_diff <- (ll - ll_old)  / abs(ll_old) * 100
-
-    if(verbose) {
-      message(glue("{i} Current: {ll_old}\tNew: {ll}\tChange: {ll_diff}"))
-    }
-
-    if(!is.na(ll_diff)) {
-      if(ll_diff < rel_tol) {
-        if(verbose) {
-          print(glue("EM converged after {i} iterations"))
-        }
-        break
-      }
-    }
-    ll_old <- ll
-  }
-
-  if(any_optim_errors) {
-    message("There were errors in optimization of Q function. However, results may still be valid. See errors above.")
-  }
-
-  gamma <- p_pi(data, params)
-  rlist <- list(
-    gamma = gamma,
-    mu = params[, 'mu'],
-    beta = params[, 'beta'],
-    phi = params[, 'phi']
-  )
-
-  if(i == max_iter) {
-    message("Maximum number of iterations reached; consider increasing max_iter")
-  }
-  return(rlist)
-}
-
 #' EM inference with tensorflow
 #' @export
 #' @importFrom glue glue
 #' @import tensorflow
-inference_tflow <- function(Y_dat, L_dat, max_iter = 100, rel_tol = 1e-5,
-                                            gene_filter_threshold = 0, verbose = TRUE,
-                                            multithread = TRUE,
-                                            bp_param = bpparam()) {
+inference_tflow <- function(Y_dat,
+                            L_dat,
+                            max_em_iter = 100,
+                            rel_em_tol = 1e-5,
+                            max_adam_iter = 100,
+                            rel_adam_tol = 1e-5,
+                            gene_filter_threshold = 0,
+                            verbose = TRUE) {
 
   zero_gene_means <- colMeans(Y_dat) <= gene_filter_threshold
 
@@ -272,8 +120,6 @@ inference_tflow <- function(Y_dat, L_dat, max_iter = 100, rel_tol = 1e-5,
 
   # Sanity checks
   stopifnot(nrow(L_dat) == G)
-
-
 
   data <- list(
     Y = Y_dat,
@@ -343,12 +189,8 @@ inference_tflow <- function(Y_dat, L_dat, max_iter = 100, rel_tol = 1e-5,
   L_y <- tf$reduce_sum(tf$reduce_logsumexp(eta_y, 1L))
 
   # Inference
-  max_iter <- 20
   mu_final <- phi_final <- NA
   l <- NA
-  max_grad_descent_iter <- 1000
-  em_tol <- 0.000001
-  grad_descent_tol <- 0.00001
 
   sess <- tf$Session()
   init <- tf$global_variables_initializer()
@@ -357,7 +199,7 @@ inference_tflow <- function(Y_dat, L_dat, max_iter = 100, rel_tol = 1e-5,
   fd <- dict(Y = Y_dat, L = L_dat, S = data$S)
   LL <- sess$run(L_y, feed_dict = fd)
 
-  for( i in seq_len(max_iter) ) {
+  for( i in seq_len(max_em_iter) ) {
 
     # E-step
     g <- sess$run(gamma, feed_dict = fd)
@@ -365,9 +207,9 @@ inference_tflow <- function(Y_dat, L_dat, max_iter = 100, rel_tol = 1e-5,
     # M-step
     gfd <- dict(Y = Y_dat, L = L_dat, S = data$S, gamma_fixed =  g)
     Q_old <- sess$run(Q, feed_dict = gfd)
-    Q_diff <- grad_descent_tol + 1
+    Q_diff <- rel_adam_tol + 1
     mi <- 0
-    while(mi < max_grad_descent_iter && Q_diff > grad_descent_tol) {
+    while(mi < max_adam_iter && Q_diff > rel_adam_tol) {
       mi <- mi + 1
       sess$run(train, feed_dict = dict(Y = data$Y, L = data$L, S = data$S, gamma_fixed = g))
       Q_new = sess$run(Q, feed_dict = dict(Y = data$Y, L = data$L, S = data$S, gamma_fixed = g))
@@ -379,8 +221,8 @@ inference_tflow <- function(Y_dat, L_dat, max_iter = 100, rel_tol = 1e-5,
       Q_old <- Q_new
     }
 
-    if(mi == max_grad_descent_iter) {
-      warning("max_grad_descent_iter reached")
+    if(mi == max_adam_iter) {
+      warning("Maxmim number of ADAM iterations reached reached")
     }
 
     L_new <- sess$run(L_y, feed_dict = fd)
@@ -389,7 +231,7 @@ inference_tflow <- function(Y_dat, L_dat, max_iter = 100, rel_tol = 1e-5,
     LL <- L_new
 
 
-    if(LL_diff < em_tol)
+    if(LL_diff < rel_em_tol)
       break
 
   }

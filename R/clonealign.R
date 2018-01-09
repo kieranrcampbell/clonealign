@@ -128,27 +128,19 @@ clonealign <- function(gene_expression_data,
   C <- ncol(L)
 
   # Sanity checking done - time to call em algorithm
-  em <- inference_em(
+  tflow_res <- inference_tflow(
     Y,
-    L,
-    size_factors,
-    max_iter,
-    rel_tol,
-    gene_filter_threshold,
-    verbose,
-    multithread,
-    bp_param
-  )
+    L)
 
   rlist <- list(
-    clone = clone_assignment(em)
+    clone = clone_assignment(tflow_res)
   )
 
   ml_params <- list(
-    clone_probs = em$gamma,
-    mu = em$mu,
-    beta = em$beta,
-    phi = em$phi
+    clone_probs = tflow_res$gamma,
+    mu = tflow_res$mu,
+    beta = tflow_res$beta,
+    phi = tflow_res$phi
   )
 
   rlist$ml_params <- ml_params
