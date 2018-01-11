@@ -73,7 +73,6 @@
 #' clones <- cal$clone
 clonealign <- function(gene_expression_data,
                        copy_number_data,
-                       size_factors = NULL,
                        max_iter = 100,
                        rel_tol = 1e-5,
                        gene_filter_threshold = 0,
@@ -102,15 +101,12 @@ clonealign <- function(gene_expression_data,
 
 
   # Parse size factors
-  if(is.null(size_factors) && is(gene_expression_data, "SingleCellExperiment")) {
-    if(!is.null(BiocGenerics::sizeFactors(gene_expression_data))) {
-      size_factors <- BiocGenerics::sizeFactors(gene_expression_data)
-    }
-  }
+  # if(is.null(size_factors) && is(gene_expression_data, "SingleCellExperiment")) {
+  #   if(!is.null(BiocGenerics::sizeFactors(gene_expression_data))) {
+  #     size_factors <- BiocGenerics::sizeFactors(gene_expression_data)
+  #   }
+  # }
 
-  if(is.null(size_factors)) {
-    size_factors <- scran::computeSumFactors(t(Y))
-  }
 
   # Parse cnv data
   if(is(copy_number_data, "data.frame") || is(copy_number_data, "DataFrame")) {

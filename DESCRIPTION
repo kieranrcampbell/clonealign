@@ -12,15 +12,15 @@ Imports:
   BiocParallel,
   BiocGenerics,
   plyr,
-  SummarizedExperiment
+  SummarizedExperiment,
+  tensorflow
 Suggests:
-  scran,
   BiocStyle,
   SingleCellExperiment,
   knitr,
   rmarkdown,
   scater,
-    testthat
+  testthat
 biocViews:
   Software, 
   Transcriptomics, 

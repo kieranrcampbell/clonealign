@@ -1,68 +1,4 @@
 
-#' @keywords internal
-likelihood_yn <- function(y, L, s_n, pi, params) {
-  m <- params[, 'mu'] * (1 + params[,'beta'] * L[, pi]) * s_n
-  phi <- params[, 'phi']
-  # m[m == 0] <- 0.1
-  ll <- sum(dnbinom2(y, mu = m, size = phi))
-  ll
-}
-
-#' Computes gamma_{nc} = p(pi_n = c), returning
-#' N by C matrix
-#'
-#' @importFrom matrixStats logSumExp
-#' @param data Input data
-#' @param params Model parameters
-#'
-#' @keywords internal
-#'
-#' @return The probability that each cell belongs to each clone, as a matrix
-p_pi <- function(data, params) {
-  gamma <- matrix(NA, nrow = data$N, ncol = data$C)
-  for(n in seq_len(data$N)) {
-    for(c in seq_len(data$C)) {
-      gamma[n,c] <- likelihood_yn(y = data$Y[n,],
-                                  L = data$L,
-                                  s_n = data$s[n],
-                                  pi = c,
-                                  params = params)
-    }
-    gamma[n,] <- exp(gamma[n,] - logSumExp(gamma[n,]))
-  }
-  gamma
-}
-
-#' @keywords internal
-#' @importFrom stats dnbinom
-dnbinom2 <- function(x, mu, size) {
-  dnbinom(x, size = size, mu = mu, log = TRUE)
-}
-
-
-#' Computes Q(theta|theta^(t))
-#' (function to be optimised under EM)
-#' @keywords internal
-#'
-#' @param pars Parameters to optimise
-#' @param y Gene expression for gene
-#' @param l Copy number profiles for gene
-#' @param gamma Expectation of clone assignments at current EM step
-#' @param data Data used
-#'
-#' @return The g'th term in the expected complete data log likelihood
-Q_g <- function(pars, y, l, gamma, data) {
-  mu <- pars[1]
-  beta <- pars[2]
-  phi <- pars[3]
-  qq <- 0
-  for(c in seq_len(data$C)) {
-    m <- mu * (1 + beta * l[c]) * data$s # N length vector for given gene of means
-    l_c <- dnbinom2(y, mu = m, size = phi) # p(y_g | pi)
-    qq <- qq + sum(gamma[,c] * l_c )
-  }
-  -qq
-}
 
 #' Computes map clone assignment given EM object
 #'
@@ -75,23 +11,6 @@ clone_assignment <- function(tflow_res) {
 
 
 
-#' @keywords internal
-log_likelihood <- function(params, data) {
-  ll <- 0
-  mu <- params[,'mu']
-  beta <- params[,'beta']
-  phi <- params[,'phi']
-
-  for(n in seq_len(data$N)) {
-    pnc <- sapply(seq_len(data$C), function(c) {
-      m <- mu * (1 + beta * data$L[,c]) * data$s[n]
-      sum(dnbinom2(data$Y[n,], m, size = phi))
-    })
-    ll <- ll + logSumExp(pnc)
-   }
-  ll
-}
-
 #' EM inference with tensorflow
 #' @export
 #' @importFrom glue glue
@@ -100,7 +19,7 @@ inference_tflow <- function(Y_dat,
                             L_dat,
                             max_em_iter = 100,
                             rel_em_tol = 1e-5,
-                            max_adam_iter = 100,
+                            max_adam_iter = 500,
                             rel_adam_tol = 1e-5,
                             gene_filter_threshold = 0,
                             verbose = TRUE) {
