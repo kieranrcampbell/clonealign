@@ -43,18 +43,17 @@ inference_tflow <- function(Y_dat,
   data <- list(
     Y = Y_dat,
     L = L_dat,
-    S = rowSums(Y_dat),
+    S = scran::computeSumFactors(t(Y_dat)),
     N = N,
     G = G,
     C = C
   )
 
   mu_guess <- colMeans(data$Y)
-  mu_guess_1 <- mu_guess[-1] / mu_guess[1]
 
   beta_init <- rep(1, data$G)
 
-  LOWER_BOUND <- 1e-6
+  LOWER_BOUND <- 1e-10
 
   # Tensorflow variables
   # Data
@@ -63,7 +62,7 @@ inference_tflow <- function(Y_dat,
   S <- tf$placeholder(tf$float32, shape = N)
 
   # Unconstrained variables
-  mu_log <- tf$Variable(tf$constant(log(mu_guess_1)))
+  mu_log <- tf$Variable(tf$constant(log(mu_guess)))
   beta_log <- tf$Variable(tf$constant(log(beta_init)))
   phi_log <- tf$Variable(tf$zeros(G))
 
@@ -72,11 +71,10 @@ inference_tflow <- function(Y_dat,
   beta <- tf$exp(beta_log) + LOWER_BOUND
   phi <- tf$exp(phi_log) + LOWER_BOUND
 
-  mu_measured <- tf$concat(list(tf$reshape(tf$constant(1.0), shape(1L)), mu), axis = 0L)
 
-  mu_gc <- tf$transpose(mu_measured * (1 + beta * tf$transpose(L)))
-  mu_c <- tf$reduce_sum(mu_gc, 0L)
-  mu_gc = mu_gc / mu_c
+  mu_gc <- tf$transpose(mu * (1 + beta * tf$transpose(L)))
+  #mu_c <- tf$reduce_sum(mu_gc, 0L)
+  #mu_gc = mu_gc / mu_c
 
   mu_ncg <- tf$transpose(tf$einsum('gc,n -> gcn', mu_gc, S), c(2L,0L,1L))
 
@@ -155,7 +153,7 @@ inference_tflow <- function(Y_dat,
 
   }
 
-  s <- sess$run(list(mu_measured, gamma, beta, phi), feed_dict = fd)
+  s <- sess$run(list(mu, gamma, beta, phi), feed_dict = fd)
   names(s) <- c("mu", "gamma", "beta", "phi")
 
   return(s)
