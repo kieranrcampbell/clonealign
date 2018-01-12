@@ -145,7 +145,7 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
 
 
   # Always normalise L
-  L <- t( t(L) / colMeans(L) )
+  # L <- t( t(L) / colMeans(L) )
 
   # Initialise
   params <- cbind(
@@ -178,11 +178,13 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     # M step
     if(multithread) {
       pnew <- bplapply(seq_len(data$G), function(g) {
+        maxL <- max(data$L[g,])
+        beta_lower_bound <- -1/maxL
         opt <- optim(par = params[g,], # (mu,phi)
                      fn = Q_g,
                      y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
                      method = "L-BFGS-B",
-                     lower = c(1e-10, 1e-10, 1e-10),
+                     lower = c(1e-10, 0, 1e-10),
                      upper = c(max(data$Y), 1e6, 1e6),
                      control = list())
         if(opt$convergence != 0) {
