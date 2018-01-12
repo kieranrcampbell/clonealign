@@ -49,9 +49,9 @@ inference_tflow <- function(Y_dat,
     C = C
   )
 
-  mu_guess <- colMeans(data$Y)
+  mu_guess <- colMeans(data$Y / data$S)
 
-  beta_init <- rep(1, data$G)
+  beta_init <- rep(0.5, data$G)
 
   LOWER_BOUND <- 1e-10
 
@@ -96,11 +96,17 @@ inference_tflow <- function(Y_dat,
   # Q function
   gamma_fixed <- tf$placeholder(dtype = tf$float32, shape = c(N, C))
 
-  Q_y <- tf$einsum('nc,ncg->g', gamma_fixed, y_log_prob)
+  Q_g <- tf$einsum('nc,ncg->g', gamma_fixed, y_log_prob)
   Q <- -(tf$reduce_sum(Q_y))
 
   optimizer <- tf$train$AdamOptimizer()
-  train <- optimizer$minimize(Q, var_list = list(mu_log, beta_log, phi_log))
+  trainers <- lapply(seq_len(data$G), function(g) {
+    g <- as.integer(g)
+    mu_g <- tf$slice(tf$reshape(mu_log, c(G, -1L)), c(g, 1L), c(g, 1L))
+    beta_g <- tf$slice(tf$reshape(beta_log, c(G, -1L)), c(g, 1L), c(g, 1L))
+    phi_g <- tf$slice(tf$reshape(phi_log, c(G, -1L)), c(g, 1L), c(g, 1L))
+    optimizer$minimize(Q_g[g], var_list = list(mu_g, beta_g, phi_g))
+  })
 
   eta_y <- tf$reduce_sum(y_log_prob, 2L)
   L_y <- tf$reduce_sum(tf$reduce_logsumexp(eta_y, 1L))
@@ -128,7 +134,10 @@ inference_tflow <- function(Y_dat,
     mi <- 0
     while(mi < max_adam_iter && Q_diff > rel_adam_tol) {
       mi <- mi + 1
-      sess$run(train, feed_dict = dict(Y = data$Y, L = data$L, S = data$S, gamma_fixed = g))
+      for(gg in seq_len(g)) {
+        print(gg)
+        sess$run(trainers[[gg]], feed_dict = dict(Y = data$Y, L = data$L, S = data$S, gamma_fixed = g))
+      }
       Q_new = sess$run(Q, feed_dict = dict(Y = data$Y, L = data$L, S = data$S, gamma_fixed = g))
       Q_diff = -(Q_new - Q_old) / abs(Q_old)
 
