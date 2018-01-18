@@ -80,7 +80,8 @@ clonealign <- function(gene_expression_data,
                        verbose = TRUE,
                        multithread = TRUE,
                        bp_param = bpparam(),
-                       phi_constant = FALSE) {
+                       phi_constant = FALSE,
+                       inits = NULL) {
 
   N <- NA # Number of cells
   G <- NA # Number of genes
@@ -128,6 +129,15 @@ clonealign <- function(gene_expression_data,
 
   C <- ncol(L)
 
+  if(!is.null(inits)) {
+    if(!is.list(inits)) {
+      stop("If not null, inits must be a list with names mu, beta, phi")
+    }
+    if(!all(names(inits) == c("mu", "beta", "phi"))) {
+      stop("If not null, inits must be a list with names mu, beta, phi")
+    }
+  }
+
   # Sanity checking done - time to call em algorithm
   em <- NULL
 
@@ -141,7 +151,8 @@ clonealign <- function(gene_expression_data,
       gene_filter_threshold,
       verbose,
       multithread,
-      bp_param
+      bp_param,
+      inits = inits
     )
   } else {
     em <- inference_em_phi_const(

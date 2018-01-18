@@ -1,7 +1,7 @@
 
 #' @keywords internal
 likelihood_yn <- function(y, L, s_n, pi, params) {
-  m <- params[, 'mu'] * (1 + params[,'beta'] * L[, pi]) * s_n
+  m <- (params[, 'mu']  + params[,'beta'] * L[, pi]) * s_n # CHANGED
   phi <- params[, 'phi']
   # m[m == 0] <- 0.1
   ll <- sum(dnbinom2(y, mu = m, size = phi))
@@ -57,7 +57,7 @@ Q_g <- function(pars, y, l, gamma, data) {
   phi <- pars[3]
   qq <- 0
   for(c in seq_len(data$C)) {
-    m <- mu * (1 + beta * l[c]) * data$s # N length vector for given gene of means
+    m <- (mu + beta * l[c]) * data$s # N length vector for given gene of means # CHANGED
     l_c <- dnbinom2(y, mu = m, size = phi) # p(y_g | pi)
     qq <- qq + sum(gamma[,c] * l_c )
   }
@@ -84,7 +84,7 @@ log_likelihood <- function(params, data) {
 
   for(n in seq_len(data$N)) {
     pnc <- sapply(seq_len(data$C), function(c) {
-      m <- mu * (1 + beta * data$L[,c]) * data$s[n]
+      m <- (mu + beta * data$L[,c]) * data$s[n] # CHANGED
       sum(dnbinom2(data$Y[n,], m, size = phi))
     })
     ll <- ll + logSumExp(pnc)
@@ -118,7 +118,8 @@ log_likelihood <- function(params, data) {
 inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
                           gene_filter_threshold = 0, verbose = TRUE,
                           multithread = TRUE,
-                          bp_param = bpparam()) {
+                          bp_param = bpparam(),
+                         inits = NULL) {
 
   zero_gene_means <- colMeans(Y) <= gene_filter_threshold
 
@@ -154,6 +155,13 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     rep(0.5, G),
     rep(1, G)
   )
+
+  if(!is.null(inits)) {
+    params[,1] <- inits$mu
+    params[,2] <- inits$beta
+    params[,3] <- inits$phi
+  }
+
   colnames(params) <- c("mu", "beta", "phi")
 
   data <- list(
