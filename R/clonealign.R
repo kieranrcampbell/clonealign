@@ -79,7 +79,8 @@ clonealign <- function(gene_expression_data,
                        gene_filter_threshold = 0,
                        verbose = TRUE,
                        multithread = TRUE,
-                       bp_param = bpparam()) {
+                       bp_param = bpparam(),
+                       phi_constant = FALSE) {
 
   N <- NA # Number of cells
   G <- NA # Number of genes
@@ -128,20 +129,37 @@ clonealign <- function(gene_expression_data,
   C <- ncol(L)
 
   # Sanity checking done - time to call em algorithm
-  em <- inference_em(
-    Y,
-    L,
-    size_factors,
-    max_iter,
-    rel_tol,
-    gene_filter_threshold,
-    verbose,
-    multithread,
-    bp_param
-  )
+  em <- NULL
+
+  if(!phi_constant) {
+    em <- inference_em(
+      Y,
+      L,
+      size_factors,
+      max_iter,
+      rel_tol,
+      gene_filter_threshold,
+      verbose,
+      multithread,
+      bp_param
+    )
+  } else {
+    em <- inference_em_phi_const(
+      Y,
+      L,
+      size_factors,
+      max_iter,
+      rel_tol,
+      gene_filter_threshold,
+      verbose,
+      multithread,
+      bp_param
+    )
+  }
 
   rlist <- list(
-    clone = clone_assignment(em)
+    clone = clone_assignment(em),
+    log_likelihoods = em$lls
   )
 
   ml_params <- list(

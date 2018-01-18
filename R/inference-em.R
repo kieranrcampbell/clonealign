@@ -107,6 +107,7 @@ log_likelihood <- function(params, data) {
 #' @param multithread Should the M-step be performed in parallel using \code{BiocParallel}? Default \code{TRUE}
 #' @param bp_param Parameters for multithreaded optimization of Q function. See \code{?bpparam()}
 #'
+#'
 #' @importFrom glue glue
 #' @importFrom BiocParallel bplapply
 #' @importFrom stats optim
@@ -168,6 +169,8 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
 
   ll_old <- log_likelihood(params, data)
 
+  lls <- ll_old
+
   any_optim_errors <- FALSE
 
   for(i in seq_len(max_iter)) {
@@ -215,6 +218,8 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     params <- pnew[,c('mu', 'beta', 'phi')]
     ll <- log_likelihood(params, data)
 
+    lls <- c(lls, ll)
+
     ll_diff <- (ll - ll_old)  / abs(ll_old) * 100
 
     if(verbose) {
@@ -241,7 +246,8 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     gamma = gamma,
     mu = params[, 'mu'],
     beta = params[, 'beta'],
-    phi = params[, 'phi']
+    phi = params[, 'phi'],
+    lls = lls
   )
 
   if(i == max_iter) {
