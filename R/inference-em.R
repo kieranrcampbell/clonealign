@@ -64,6 +64,24 @@ Q_g <- function(pars, y, l, gamma, data) {
   -qq
 }
 
+#' @export
+Qgr_g <- function(pars, y, l, gamma, data) {
+  mu <- pars[1]
+  phi <- pars[2]
+  gr <- c('mu' = 0, 'phi' = 0)
+  for(c in seq_len(data$C)) {
+    mu_ng <- mu * data$s * l[c] # N-length vector
+
+    gr_1 <- (y / mu_ng - (y + phi) / (mu_ng + phi) ) * data$s * l[c]
+    gr[1] <- gr[1] + sum(gamma[,c] * gr_1)
+
+    gr_2 <- digamma(phi + y) - digamma(phi) - y / (phi + mu_ng) +
+      log(phi) + 1 - log(phi + mu_ng) - phi / (phi + mu_ng)
+    gr[2] <- gr[2] + sum(gamma[,c] * gr_2)
+  }
+  -gr
+}
+
 #' Computes map clone assignment given EM object
 #'
 #' @param em List returned by \code{inference_em}
@@ -179,7 +197,7 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
       pnew <- bplapply(seq_len(data$G), function(g) {
         opt <- optim(par = params[g,], # (mu,phi)
                      fn = Q_g,
-                     # gr = grad_g,
+                     gr = Qgr_g,
                      y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
                      method = "L-BFGS-B",
                      lower = c(1e-10, 1e-10),
@@ -195,7 +213,7 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
       pnew <- lapply(seq_len(data$G), function(g) {
         opt <- optim(par = params[g,], # (mu,phi)
                      fn = Q_g,
-                     # gr = grad_g,
+                     gr = Qgr_g,
                      y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
                      method = "L-BFGS-B",
                      lower = c(1e-10, 1e-10),
