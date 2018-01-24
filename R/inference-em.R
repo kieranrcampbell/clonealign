@@ -165,6 +165,8 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
 
   ll_old <- log_likelihood(params, data)
 
+  lls <- ll_old
+
   any_optim_errors <- FALSE
 
   for(i in seq_len(max_iter)) {
@@ -213,6 +215,8 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
 
     ll_diff <- (ll - ll_old)  / abs(ll_old) * 100
 
+    lls <- c(lls, ll)
+
     if(verbose) {
       message(glue("{i} Current: {ll_old}\tNew: {ll}\tChange: {ll_diff}"))
     }
@@ -236,7 +240,8 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
   rlist <- list(
     gamma = gamma,
     mu = params[, 'mu'],
-    phi = params[, 'phi']
+    phi = params[, 'phi'],
+    lls = lls
   )
 
   if(i == max_iter) {

@@ -141,7 +141,8 @@ clonealign <- function(gene_expression_data,
   )
 
   rlist <- list(
-    clone = clone_assignment(em)
+    clone = clone_assignment(em),
+    log_likelihoods = em$lls
   )
 
   ml_params <- list(
