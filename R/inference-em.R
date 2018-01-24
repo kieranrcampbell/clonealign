@@ -197,7 +197,7 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
       pnew <- bplapply(seq_len(data$G), function(g) {
         opt <- optim(par = params[g,], # (mu,phi)
                      fn = Q_g,
-                     gr = Qgr_g,
+                     gr = Qgr_g, <- <- <- <-
                      y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
                      method = "L-BFGS-B",
                      lower = c(1e-10, 1e-10),

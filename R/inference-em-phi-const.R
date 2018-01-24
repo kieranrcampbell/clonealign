@@ -1,8 +1,7 @@
 
 #' @keywords internal
 likelihood_yn_phi_const <- function(y, L, s_n, pi, params, phi) {
-  m <- params[, 'mu'] * (1 + params[,'beta'] * L[, pi]) * s_n
-  # m[m == 0] <- 0.1
+  m <- L[, pi] * s_n * params[, 'mu']
   ll <- sum(dnbinom2(y, mu = m, size = phi))
   ll
 }
@@ -53,28 +52,38 @@ dnbinom2 <- function(x, mu, size) {
 #' @return The g'th term in the expected complete data log likelihood
 Q_g_phi_const <- function(pars, y, l, gamma, data) {
   mu <- pars[1]
-  beta <- pars[2]
   qq <- 0
   for(c in seq_len(data$C)) {
-    m <- mu * (1 + beta * l[c]) * data$s # N length vector for given gene of means
+    m <- l[c] * data$s * mu # N length vector for given gene of means
     l_c <- dnbinom2(y, mu = m, size = data$phi) # p(y_g | pi)
     qq <- qq + sum(gamma[,c] * l_c )
   }
   -qq
 }
 
+#' @export
+Qgr_g_phi_const <- function(pars, y, l, gamma, data) {
+  mu <- pars[1]
+  phi <- data$phi
+  gr <- c('mu' = 0)
+  for(c in seq_len(data$C)) {
+    mu_ng <- mu * data$s * l[c] # N-length vector
+
+    gr_1 <- (y / mu_ng - (y + phi) / (mu_ng + phi) ) * data$s * l[c]
+    gr[1] <- gr[1] + sum(gamma[,c] * gr_1)
+  }
+  -gr
+}
 
 
 #' @keywords internal
 log_likelihood_phi_const <- function(params, data) {
   ll <- 0
   mu <- params[,'mu']
-  beta <- params[,'beta']
 
   for(n in seq_len(data$N)) {
     pnc <- sapply(seq_len(data$C), function(c) {
-      m <- mu * (1 + beta * data$L[,c]) * data$s[n]
-      sum(dnbinom2(data$Y[n,], m, size = data$phi))
+      sum(dnbinom2(data$Y[n,], mu * data$L[,c] * data$s[n], size = data$phi))
     })
     ll <- ll + logSumExp(pnc)
    }
@@ -134,14 +143,13 @@ inference_em_phi_const <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-
 
 
   # Always normalise L
-  # L <- t( t(L) / colMeans(L) )
+  L <- t( t(L) / colMeans(L) )
 
   # Initialise
   params <- cbind(
-    colMeans(Y / s) + 0.01,
-    rep(0.5, G)
+    colMeans(Y / s) + 0.01
   )
-  colnames(params) <- c("mu", "beta")
+  colnames(params) <- c("mu")
 
   data <- list(
     Y = Y,
@@ -150,12 +158,14 @@ inference_em_phi_const <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-
     N = N,
     G = G,
     C = C,
-    phi = 0.1# compute_phi(Y) # TODO CHANGE
+    phi = compute_phi(Y)
   )
 
   data$L[data$L == 0] <- 1
 
   ll_old <- log_likelihood_phi_const(params, data)
+
+  lls <- ll_old
 
   any_optim_errors <- FALSE
 
@@ -166,13 +176,15 @@ inference_em_phi_const <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-
 
     # M step
     if(multithread) {
+      stop("Why is this multithreading")
       pnew <- bplapply(seq_len(data$G), function(g) {
         opt <- optim(par = params[g,],
                      fn = Q_g_phi_const,
+                     gr = Qgr_g_phi_const,
                      y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
                      method = "L-BFGS-B",
-                     lower = c(1e-10, 0),
-                     upper = c(max(data$Y), 1e6),
+                     lower = c(1e-10),
+                     upper = c(max(data$Y)),
                      control = list())
         if(opt$convergence != 0) {
           warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
@@ -184,24 +196,28 @@ inference_em_phi_const <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-
       pnew <- bplapply(seq_len(data$G), function(g) {
         opt <- optim(par = params[g,], # (mu,phi)
                      fn = Q_g_phi_const,
+                     gr = Qgr_g_phi_const,
                      y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
                      method = "L-BFGS-B",
-                     lower = c(1e-10, 0),
-                     upper = c(max(data$Y), 1e6),
+                     lower = c(1e-10),
+                     upper = c(max(data$Y)),
                      control = list())
         if(opt$convergence != 0) {
           warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
           any_optim_errors <- TRUE
         }
-        c(opt$par, -opt$value)
+        c('mu' = opt$par, 'value' = -opt$value)
       })
     }
 
     pnew <- do.call(rbind, pnew)
-    params <- pnew[,c('mu', 'beta')]
+    colnames(pnew) <- c("mu", "value")
+    params <- pnew[,"mu",drop=FALSE] # just mu
     ll <- log_likelihood_phi_const(params, data)
 
     ll_diff <- (ll - ll_old)  / abs(ll_old) * 100
+
+    lls <- c(lls, ll)
 
     if(verbose) {
       message(glue("{i} Current: {ll_old}\tNew: {ll}\tChange: {ll_diff}"))
@@ -226,8 +242,8 @@ inference_em_phi_const <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-
   rlist <- list(
     gamma = gamma,
     mu = params[, 'mu'],
-    beta = params[, 'beta'],
-    phi = data$phi
+    phi = data$phi,
+    lls = lls
   )
 
   if(i == max_iter) {
