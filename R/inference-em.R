@@ -120,6 +120,11 @@ log_likelihood <- function(params, data) {
   ll
 }
 
+
+
+# Main EM algorithm -------------------------------------------------------
+
+
 #' Expectation-maximization for assigning scRNA-seq data
 #' to clone-of-origin
 #'
@@ -144,7 +149,7 @@ log_likelihood <- function(params, data) {
 #' @return A list with ML estimates for each of the model parameters
 inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
                           gene_filter_threshold = 0, verbose = TRUE,
-                          multithread = TRUE,
+                          multithread = FALSE,
                           bp_param = bpparam()) {
 
   zero_gene_means <- colMeans(Y) <= gene_filter_threshold
@@ -178,9 +183,10 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
   # Initialise
   params <- cbind(
     colMeans(Y / s) + 0.01,
+    colMeans(Y / s) + 0.01,
     rep(1, G)
   )
-  colnames(params) <- c("mu", "phi")
+  colnames(params) <- c("mu", "beta", "phi")
 
   data <- list(
     Y = Y,
@@ -190,6 +196,8 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     G = G,
     C = C
   )
+
+  rho <- sample(c(0,1), data$G, replace = TRUE)
 
   data$L[data$L == 0] <- 1
 
@@ -201,8 +209,8 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
 
   for(i in seq_len(max_iter)) {
 
-    # E step
-    gamma <- p_pi(data, params)
+    # E step - now with added Gibbs sampling
+    gibbs_samples <- gibbs_pi_rho[]
 
     # M step
     if(multithread) {
