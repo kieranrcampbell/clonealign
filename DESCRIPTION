@@ -20,7 +20,7 @@ Suggests:
   knitr,
   rmarkdown,
   scater,
-    testthat
+  testthat
 biocViews:
   Software, 
   Transcriptomics, 

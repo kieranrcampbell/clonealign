@@ -50,6 +50,8 @@ dnbinom2 <- function(x, mu, size) {
 #' @param gamma Expectation of clone assignments at current EM step
 #' @param data Data used
 #'
+#' @keywords internal
+#'
 #' @return The g'th term in the expected complete data log likelihood
 Q_g <- function(pars, y, l, gamma, data) {
   mu <- pars[1]
@@ -64,7 +66,17 @@ Q_g <- function(pars, y, l, gamma, data) {
   -qq
 }
 
-#' @export
+#' Gradient of Q(theta|theta^(t)) (function to be optimised under EM)
+#'
+#' @param pars Parameters to optimise
+#' @param y Gene expression for gene
+#' @param l Copy number profiles for gene
+#' @param gamma Expectation of clone assignments at current EM step
+#' @param data Data used
+#'
+#' @keywords internal
+#'
+#' @return The gradient g'th term in the expected complete data log likelihood
 Qgr_g <- function(pars, y, l, gamma, data) {
   mu <- pars[1]
   phi <- pars[2]
@@ -197,7 +209,7 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
       pnew <- bplapply(seq_len(data$G), function(g) {
         opt <- optim(par = params[g,], # (mu,phi)
                      fn = Q_g,
-                     gr = Qgr_g, <- <- <- <-
+                     gr = Qgr_g,
                      y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
                      method = "L-BFGS-B",
                      lower = c(1e-10, 1e-10),

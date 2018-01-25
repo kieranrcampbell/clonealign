@@ -6,7 +6,7 @@
 \usage{
 clonealign(gene_expression_data, copy_number_data, size_factors = NULL,
   max_iter = 100, rel_tol = 1e-05, gene_filter_threshold = 0,
-  verbose = TRUE, multithread = TRUE, bp_param = bpparam())
+  verbose = TRUE, multithread = FALSE, bp_param = bpparam())
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
