@@ -53,17 +53,19 @@ dnbinom2 <- function(x, mu, size) {
 #' @keywords internal
 #'
 #' @return The g'th term in the expected complete data log likelihood
-Q_g <- function(pars, y, l, gamma, data) {
+Q_g <- function(pars, y, l, data, pi_traces, rho_traces, lambda, l_g_hat) {
   mu <- pars[1]
-  phi <- pars[2]
+  beta <- pars[2]
+  phi <- pars[3]
   qq <- 0
-  for(c in seq_len(data$C)) {
-    m <- l[c] * data$s * mu # N length vector for given gene of means
-    # m[m == 0] <- 1
+  for(it in seq_along(rho_traces)) {
+    rho <- rho_traces[it]
+    pi <- pi_traces[it,]
+    m <- data$s * ((1 - rho) * mu + rho * beta * l[pi])
     l_c <- dnbinom2(y, mu = m, size = phi) # p(y_g | pi)
-    qq <- qq + sum(gamma[,c] * l_c )
+    qq <- qq + sum(l_c )
   }
-  -qq
+  -qq + lambda * (mu - l_g_hat * beta)^2
 }
 
 #' Gradient of Q(theta|theta^(t)) (function to be optimised under EM)
@@ -77,20 +79,35 @@ Q_g <- function(pars, y, l, gamma, data) {
 #' @keywords internal
 #'
 #' @return The gradient g'th term in the expected complete data log likelihood
-Qgr_g <- function(pars, y, l, gamma, data) {
+Qgr_g <- function(pars, y, l, data, pi_traces, rho_traces, lambda, l_g_hat) {
   mu <- pars[1]
-  phi <- pars[2]
-  gr <- c('mu' = 0, 'phi' = 0)
-  for(c in seq_len(data$C)) {
-    mu_ng <- mu * data$s * l[c] # N-length vector
+  beta <- pars[2]
+  phi <- pars[3]
+  gr <- c('mu' = 0, 'beta' = 0, 'phi' = 0)
 
-    gr_1 <- (y / mu_ng - (y + phi) / (mu_ng + phi) ) * data$s * l[c]
-    gr[1] <- gr[1] + sum(gamma[,c] * gr_1)
+  for(it in seq_along(rho_traces)) {
+    rho <- rho_traces[it]
+    pi <- pi_traces[it,]
 
-    gr_2 <- digamma(phi + y) - digamma(phi) - y / (phi + mu_ng) +
+    mu_ng <- data$s * ((1 - rho) * mu +  rho * beta * l[pi])
+
+    d_py_d_mung <- (y / mu_ng - (y + phi) / (mu_ng + phi))
+
+    gr_1 <- d_py_d_mung * data$s * (1 - rho)
+    gr[1] <- gr[1] + sum(gr_1)
+
+    gr_2 <- d_py_d_mung * data$s * rho * l[pi]
+    gr[2] <- gr[2] + sum(gr_2)
+
+    gr_3 <- digamma(phi + y) - digamma(phi) - y / (phi + mu_ng) +
       log(phi) + 1 - log(phi + mu_ng) - phi / (phi + mu_ng)
-    gr[2] <- gr[2] + sum(gamma[,c] * gr_2)
+    gr[3] <- gr[3] + sum(gr_3)
   }
+
+  # Add on penalty - remember the minus sign!
+  gr[1] <- gr[1] - 2 * lambda * (mu - l_g_hat * beta)
+  gr[2] <- gr[2] - 2 * lambda * (l_g_hat * beta - mu) * l_g_hat
+
   -gr
 }
 
@@ -109,15 +126,17 @@ clone_assignment <- function(em) {
 log_likelihood <- function(params, data) {
   ll <- 0
   mu <- params[,'mu']
+  beta <- params[,'beta']
   phi <- params[,'phi']
 
   for(n in seq_len(data$N)) {
     pnc <- sapply(seq_len(data$C), function(c) {
-     sum(dnbinom2(data$Y[n,], mu * data$L[,c] * data$s[n], size = phi))
+     c(sum(dnbinom2(data$Y[n,], beta * data$L[,c] * data$s[n], size = phi)),
+       sum(dnbinom2(data$Y[n,], mu * data$s[n], size = phi)))
     })
-    ll <- ll + logSumExp(pnc)
+    ll <- ll + logSumExp(as.vector(pnc))
    }
-  ll
+  ll - sum((2 * mu - beta)^2)
 }
 
 
@@ -147,10 +166,18 @@ log_likelihood <- function(params, data) {
 #' @keywords internal
 #'
 #' @return A list with ML estimates for each of the model parameters
-inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
-                          gene_filter_threshold = 0, verbose = TRUE,
-                          multithread = FALSE,
-                          bp_param = bpparam()) {
+inference_em <- function(Y,
+                         L,
+                         s = NULL,
+                         max_iter = 100,
+                         rel_tol = 1e-5,
+                         gene_filter_threshold = 0,
+                         verbose = TRUE,
+                         multithread = FALSE,
+                         mcmc_iteration_multiple = 5,
+                         bp_param = bpparam(),
+                         rho_init = NULL,
+                         lambda = 1) {
 
   zero_gene_means <- colMeans(Y) <= gene_filter_threshold
 
@@ -194,10 +221,14 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     s = s,
     N = N,
     G = G,
-    C = C
+    C = C,
+    l_g_hat = rowMeans(L)
   )
 
   rho <- sample(c(0,1), data$G, replace = TRUE)
+  if(!is.null(rho_init)) {
+    rho <- rho_init
+  }
 
   data$L[data$L == 0] <- 1
 
@@ -210,45 +241,35 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
   for(i in seq_len(max_iter)) {
 
     # E step - now with added Gibbs sampling
-    gibbs_samples <- gibbs_pi_rho[]
+    gibbs_samples <- gibbs_pi_rho(rho, data, params, n_iter = 10 + mcmc_iteration_multiple * i)
+    rho <- gibbs_samples$rho_traces[1,]
 
     # M step
-    if(multithread) {
-      pnew <- bplapply(seq_len(data$G), function(g) {
-        opt <- optim(par = params[g,], # (mu,phi)
-                     fn = Q_g,
-                     gr = Qgr_g,
-                     y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
-                     method = "L-BFGS-B",
-                     lower = c(1e-10, 1e-10),
-                     upper = c(max(data$Y), 1e6),
-                     control = list())
-        if(opt$convergence != 0) {
-          warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
-          any_optim_errors <- TRUE
-        }
-        c(opt$par, -opt$value)
-      }, BPPARAM = bp_param)
-    } else {
-      pnew <- lapply(seq_len(data$G), function(g) {
-        opt <- optim(par = params[g,], # (mu,phi)
-                     fn = Q_g,
-                     gr = Qgr_g,
-                     y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
-                     method = "L-BFGS-B",
-                     lower = c(1e-10, 1e-10),
-                     upper = c(max(data$Y), 1e6),
-                     control = list())
-        if(opt$convergence != 0) {
-          warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
-          any_optim_errors <- TRUE
-        }
-        c(opt$par, -opt$value)
-      })
-    }
+    n_optim_errors <- 0
+    pnew <- lapply(seq_len(data$G), function(g) {
+      opt <- optim(par = params[g,], # (mu,beta,phi)
+                   fn = Q_g,
+                   gr = Qgr_g,
+                   y = data$Y[,g], l = data$L[g,], data = data,
+                   pi_traces = gibbs_samples$pi_trace,
+                   rho_traces = gibbs_samples$rho_trace[,g],
+                   l_g_hat = data$l_g_hat[g],
+                   lambda = 1,
+                   method = "L-BFGS-B",
+                   lower = c(1e-10, 1e-10, 1e-10),
+                   upper = c(max(data$Y), 1e6, 1e6),
+                   control = list())
+      if(opt$convergence != 0) {
+        n_optim_errors <<- n_optim_errors + 1
+      }
+      c(opt$par, -opt$value)
+    })
+
+    print(glue("{n_optim_errors} optimization errors"))
+
 
     pnew <- do.call(rbind, pnew)
-    params <- pnew[,c('mu', 'phi')]
+    params <- pnew[,c('mu', 'beta', 'phi')]
     ll <- log_likelihood(params, data)
 
     ll_diff <- (ll - ll_old)  / abs(ll_old) * 100
@@ -260,7 +281,7 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     }
 
     if(!is.na(ll_diff)) {
-      if(ll_diff < rel_tol) {
+      if(abs(ll_diff) < rel_tol) { # TODO remove abs
         if(verbose) {
           print(glue("EM converged after {i} iterations"))
         }
@@ -274,12 +295,14 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     message("There were errors in optimization of Q function. However, results may still be valid. See errors above.")
   }
 
-  gamma <- p_pi(data, params)
+  gibbs_samples <- gibbs_pi_rho(rho, data, params, n_mcmc_iter)
   rlist <- list(
     gamma = gamma,
     mu = params[, 'mu'],
+    beta = params[,'beta'],
     phi = params[, 'phi'],
-    lls = lls
+    lls = lls,
+    gibbs_samples = gibbs_samples
   )
 
   if(i == max_iter) {
