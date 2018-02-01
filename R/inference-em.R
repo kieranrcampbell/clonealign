@@ -92,6 +92,56 @@ Qgr_g <- function(pars, y, l, gamma, data) {
   -gr
 }
 
+#' Computes Q(theta|theta^(t)) for constant phi
+#' (function to be optimised under EM)
+#' @keywords internal
+#'
+#' @param pars Parameters to optimise
+#' @param y Gene expression for gene
+#' @param l Copy number profiles for gene
+#' @param gamma Expectation of clone assignments at current EM step
+#' @param data Data used
+#' @param phi Dispersion value
+#'
+#' @keywords internal
+#'
+#' @return The g'th term in the expected complete data log likelihood
+Q_g_phi_const <- function(pars, y, l, gamma, data, phi) {
+  mu <- pars[1]
+  qq <- 0
+  for(c in seq_len(data$C)) {
+    m <- l[c] * data$s * mu # N length vector for given gene of means
+    l_c <- dnbinom2(y, mu = m, size = phi) # p(y_g | pi)
+    qq <- qq + sum(gamma[,c] * l_c )
+  }
+  -qq
+}
+
+#' Gradient of Q(theta|theta^(t)) (function to be optimised under EM) for constant phi
+#'
+#' @param pars Parameters to optimise
+#' @param y Gene expression for gene
+#' @param l Copy number profiles for gene
+#' @param gamma Expectation of clone assignments at current EM step
+#' @param data Data used
+#' @param phi Dispersion value
+#'
+#' @keywords internal
+#'
+#' @return The gradient g'th term in the expected complete data log likelihood
+Qgr_g_phi_const <- function(pars, y, l, gamma, data, phi) {
+  mu <- pars[1]
+  gr <- c('mu' = 0)
+  for(c in seq_len(data$C)) {
+    mu_ng <- mu * data$s * l[c] # N-length vector
+
+    gr_1 <- (y / mu_ng - (y + phi) / (mu_ng + phi) ) * data$s * l[c]
+    gr[1] <- gr[1] + sum(gamma[,c] * gr_1)
+
+  }
+  -gr
+}
+
 #' Computes map clone assignment given EM object
 #'
 #' @param em List returned by \code{inference_em}
@@ -132,6 +182,7 @@ log_likelihood <- function(params, data) {
 #' @param verbose Logical - should convergence information be printed?
 #' @param multithread Should the M-step be performed in parallel using \code{BiocParallel}? Default \code{TRUE}
 #' @param bp_param Parameters for multithreaded optimization of Q function. See \code{?bpparam()}
+#' @param phi_const Logical - should the dispersion be empirically estimated?
 #'
 #' @importFrom glue glue
 #' @importFrom BiocParallel bplapply
@@ -140,10 +191,16 @@ log_likelihood <- function(params, data) {
 #' @keywords internal
 #'
 #' @return A list with ML estimates for each of the model parameters
-inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
-                          gene_filter_threshold = 0, verbose = TRUE,
-                          multithread = TRUE,
-                          bp_param = bpparam()) {
+inference_em <- function(Y,
+                         L,
+                         s = NULL,
+                         max_iter = 100,
+                         rel_tol = 1e-5,
+                         gene_filter_threshold = 0,
+                         verbose = TRUE,
+                         multithread = TRUE,
+                         bp_param = bpparam(),
+                         phi_const = FALSE) {
 
   zero_gene_means <- colMeans(Y) <= gene_filter_threshold
 
@@ -175,10 +232,11 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
 
   # Initialise
   params <- cbind(
-    colMeans(Y / s) + 0.01,
-    rep(1, G)
+    colMeans(Y / s) + 0.01, # Mean
+    rep(1, G) # Phi
   )
   colnames(params) <- c("mu", "phi")
+
 
   data <- list(
     Y = Y,
@@ -189,7 +247,14 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     C = C
   )
 
-  data$L[data$L == 0] <- 1
+  if(phi_const) {
+    # Estimate empirical dispersion
+    params[,'phi'] <- empirical_dispersion_estimate(data)
+    params[params[,'phi'] < 0,'phi'] <- 0.1
+  }
+
+
+  data$L[data$L == 0] <- 1 # TODO remove
 
   ll_old <- log_likelihood(params, data)
 
@@ -203,42 +268,86 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     gamma <- p_pi(data, params)
 
     # M step
-    if(multithread) {
-      pnew <- bplapply(seq_len(data$G), function(g) {
-        opt <- optim(par = params[g,], # (mu,phi)
-                     fn = Q_g,
-                     gr = Qgr_g,
-                     y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
-                     method = "L-BFGS-B",
-                     lower = c(1e-10, 1e-10),
-                     upper = c(max(data$Y), 1e6),
-                     control = list())
-        if(opt$convergence != 0) {
-          warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
-          any_optim_errors <- TRUE
-        }
-        c(opt$par, -opt$value)
-      }, BPPARAM = bp_param)
+    if(!phi_const) {
+      if(multithread) {
+        pnew <- bplapply(seq_len(data$G), function(g) {
+          opt <- optim(par = params[g,], # (mu,phi)
+                       fn = Q_g,
+                       gr = Qgr_g,
+                       y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
+                       method = "L-BFGS-B",
+                       lower = c(1e-10, 1e-10),
+                       upper = c(max(data$Y), 1e6),
+                       control = list())
+          if(opt$convergence != 0) {
+            warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
+            any_optim_errors <- TRUE
+          }
+          c(opt$par, -opt$value)
+        }, BPPARAM = bp_param)
+      } else {
+        pnew <- lapply(seq_len(data$G), function(g) {
+          opt <- optim(par = params[g,], # (mu,phi)
+                       fn = Q_g,
+                       gr = Qgr_g,
+                       y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
+                       method = "L-BFGS-B",
+                       lower = c(1e-10, 1e-10),
+                       upper = c(max(data$Y), 1e6),
+                       control = list())
+          if(opt$convergence != 0) {
+            warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
+            any_optim_errors <- TRUE
+          }
+          c(opt$par, -opt$value)
+        })
+      }
+
+      pnew <- do.call(rbind, pnew)
+      params <- pnew[,c('mu', 'phi')]
+
     } else {
-      pnew <- lapply(seq_len(data$G), function(g) {
-        opt <- optim(par = params[g,], # (mu,phi)
-                     fn = Q_g,
-                     gr = Qgr_g,
-                     y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
-                     method = "L-BFGS-B",
-                     lower = c(1e-10, 1e-10),
-                     upper = c(max(data$Y), 1e6),
-                     control = list())
-        if(opt$convergence != 0) {
-          warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
-          any_optim_errors <- TRUE
-        }
-        c(opt$par, -opt$value)
-      })
+      if(multithread) {
+        pnew <- bplapply(seq_len(data$G), function(g) {
+          opt <- optim(par = params[g,1], # (mu,)
+                       fn = Q_g_phi_const,
+                       gr = Qgr_g_phi_const,
+                       y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
+                       phi = params[g,2],
+                       method = "L-BFGS-B",
+                       lower = c(1e-10),
+                       upper = c(max(data$Y)),
+                       control = list())
+          if(opt$convergence != 0) {
+            warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
+            any_optim_errors <- TRUE
+          }
+          c(opt$par, -opt$value)
+        }, BPPARAM = bp_param)
+      } else {
+        pnew <- lapply(seq_len(data$G), function(g) {
+          opt <- optim(par = params[g,1], # (mu,)
+                       fn = Q_g_phi_const,
+                       gr = Qgr_g_phi_const,
+                       y = data$Y[,g], l = data$L[g,], gamma = gamma, data = data,
+                       phi = params[g,2],
+                       method = "L-BFGS-B",
+                       lower = c(1e-10),
+                       upper = c(max(data$Y)),
+                       control = list())
+          if(opt$convergence != 0) {
+            warning(glue("L-BFGS-B optimization of Q function warning: {opt$message}"))
+            any_optim_errors <- TRUE
+          }
+          c(opt$par, -opt$value)
+        })
+      }
+      pnew <- do.call(rbind, pnew)
+      params <- cbind(pnew[,1], params[,'phi'])
+      colnames(params) <- c("mu", "phi")
     }
 
-    pnew <- do.call(rbind, pnew)
-    params <- pnew[,c('mu', 'phi')]
+
     ll <- log_likelihood(params, data)
 
     ll_diff <- (ll - ll_old)  / abs(ll_old) * 100
@@ -252,7 +361,7 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     if(!is.na(ll_diff)) {
       if(ll_diff < rel_tol) {
         if(verbose) {
-          print(glue("EM converged after {i} iterations"))
+          message(glue("EM converged after {i} iterations"))
         }
         break
       }
@@ -266,9 +375,6 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
 
   gamma <- p_pi(data, params)
 
-  print(colMeans(params))
-  print(str(params))
-
   rlist <- list(
     gamma = gamma,
     mu = params[, 'mu'],
@@ -280,6 +386,36 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
     message("Maximum number of iterations reached; consider increasing max_iter")
   }
   return(rlist)
+}
+
+#' @importFrom stats loess
+#' @importFrom tibble data_frame
+#'
+empirical_dispersion_estimate <- function(data) {
+
+  Y <- data$Y
+  dsf <- data$s
+
+  w <- colVars(Y / dsf)
+  q <- colMeans(Y / dsf)
+
+  z <- q * mean(1 / dsf)
+
+  l <- loess(log(w) ~ log(q))
+
+  df <- data_frame(q, w, z, w_q = exp(predict(l)))
+
+  # ggplot(df, aes(x = q, y = w)) +
+  #   geom_point() +
+  #   scale_x_log10() +
+  #   scale_y_log10() +
+  #   geom_line(aes(y = w_q), color = 'red')
+
+  df <- dplyr::mutate(df, v = w_q - z, mu = sum(dsf) * q, var = mu + sum(dsf^2) * v) %>%
+    dplyr::mutate(dispersion = 1 / ((var - mu) / (mu^2)))
+
+  df$dispersion
+
 }
 
 

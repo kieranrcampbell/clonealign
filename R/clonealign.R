@@ -79,7 +79,8 @@ clonealign <- function(gene_expression_data,
                        gene_filter_threshold = 0,
                        verbose = TRUE,
                        multithread = FALSE,
-                       bp_param = bpparam()) {
+                       bp_param = bpparam(),
+                       phi_const = FALSE) {
 
   N <- NA # Number of cells
   G <- NA # Number of genes
@@ -140,7 +141,8 @@ clonealign <- function(gene_expression_data,
       gene_filter_threshold,
       verbose,
       multithread,
-      bp_param
+      bp_param,
+      phi_const
     )
   # } else {
   #   em <- inference_em_phi_const(
