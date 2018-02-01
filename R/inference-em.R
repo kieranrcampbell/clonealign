@@ -1,9 +1,8 @@
 
 #' @keywords internal
-likelihood_yn <- function(y, L, s_n, pi, params) {
-  m <- L[, pi] * s_n * params[, 'mu']
+likelihood_yn <- function(y, l, s_n, params) {
+  m <- l * s_n * params[, 'mu']
   phi <- params[, 'phi']
-  # m[m == 0] <- 0.1
   ll <- sum(dnbinom2(y, mu = m, size = phi))
   ll
 }
@@ -23,9 +22,8 @@ p_pi <- function(data, params) {
   for(n in seq_len(data$N)) {
     for(c in seq_len(data$C)) {
       gamma[n,c] <- likelihood_yn(y = data$Y[n,],
-                                  L = data$L,
+                                  l = data$L[,c],
                                   s_n = data$s[n],
-                                  pi = c,
                                   params = params)
     }
     gamma[n,] <- exp(gamma[n,] - logSumExp(gamma[n,]))
@@ -267,6 +265,10 @@ inference_em <- function(Y, L, s = NULL, max_iter = 100, rel_tol = 1e-5,
   }
 
   gamma <- p_pi(data, params)
+
+  print(colMeans(params))
+  print(str(params))
+
   rlist <- list(
     gamma = gamma,
     mu = params[, 'mu'],
