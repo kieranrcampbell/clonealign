@@ -405,12 +405,6 @@ empirical_dispersion_estimate <- function(data) {
 
   df <- data_frame(q, w, z, w_q = exp(predict(l)))
 
-  # ggplot(df, aes(x = q, y = w)) +
-  #   geom_point() +
-  #   scale_x_log10() +
-  #   scale_y_log10() +
-  #   geom_line(aes(y = w_q), color = 'red')
-
   df <- dplyr::mutate(df, v = w_q - z, mu = sum(dsf) * q, var = mu + sum(dsf^2) * v) %>%
     dplyr::mutate(dispersion = 1 / ((var - mu) / (mu^2)))
 
