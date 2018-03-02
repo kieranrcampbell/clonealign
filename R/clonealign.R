@@ -160,7 +160,8 @@ clonealign <- function(gene_expression_data,
 
   rlist <- list(
     clone = clone_assignment(em),
-    log_likelihoods = em$lls
+    log_likelihoods = em$lls,
+    genes_used = em$genes_used
   )
 
   ml_params <- list(

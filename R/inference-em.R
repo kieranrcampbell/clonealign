@@ -204,6 +204,8 @@ inference_em <- function(Y,
 
   zero_gene_means <- colMeans(Y) <= gene_filter_threshold
 
+  genes_used <- which(!zero_gene_means)
+
   if(verbose) {
     message(glue("Removing {sum(zero_gene_means)} genes with low counts"))
   }
@@ -379,7 +381,8 @@ inference_em <- function(Y,
     gamma = gamma,
     mu = params[, 'mu'],
     phi = params[, 'phi'],
-    lls = lls
+    lls = lls,
+    genes_used = genes_used
   )
 
   if(i == max_iter) {
