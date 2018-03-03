@@ -4,9 +4,9 @@
 \alias{clonealign}
 \title{Assign scRNA-seq to clone-of-origin}
 \usage{
-clonealign(gene_expression_data, copy_number_data, size_factors = NULL,
-  max_iter = 100, rel_tol = 1e-05, gene_filter_threshold = 0,
-  verbose = TRUE, multithread = TRUE, bp_param = bpparam())
+clonealign(gene_expression_data, copy_number_data, max_iter = 100,
+  rel_tol = 1e-05, gene_filter_threshold = 0, verbose = TRUE,
+  multithread = TRUE, bp_param = bpparam())
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -14,9 +14,6 @@ clonealign(gene_expression_data, copy_number_data, size_factors = NULL,
 
 \item{copy_number_data}{A matrix or data frame of copy number calls for each clone.
 See \code{details}.}
-
-\item{size_factors}{Vector of cell size factors. If NULL computed using
-\code{scran::computeSumFactors}}
 
 \item{max_iter}{Maximum number of EM iterations before algorithm is terminated}
 
@@ -32,6 +29,9 @@ be filtered out (removes genes with no counts by default)}
 
 \item{bp_param}{Parameters for parallel optimization of the Q function during EM. Default parameters
 taken by call to \code{bpparam()}. See \code{?bpparam} for more details.}
+
+\item{size_factors}{Vector of cell size factors. If NULL computed using
+\code{scran::computeSumFactors}}
 }
 \value{
 An object of class \code{clonealign_fit}. The maximum likelihood estimates of the

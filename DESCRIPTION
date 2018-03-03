@@ -13,7 +13,8 @@ Imports:
   BiocGenerics,
   plyr,
   SummarizedExperiment,
-  tensorflow
+  tensorflow,
+  progress
 Suggests:
   BiocStyle,
   SingleCellExperiment,

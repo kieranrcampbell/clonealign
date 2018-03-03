@@ -73,12 +73,12 @@
 #' clones <- cal$clone
 clonealign <- function(gene_expression_data,
                        copy_number_data,
-                       max_iter = 100,
-                       rel_tol = 1e-5,
+                       max_em_iter = 50,
+                       max_adam_iter = 200,
+                       rel_tol_em = 1e-5,
+                       rel_tol_adam = 1e-5,
                        gene_filter_threshold = 0,
-                       verbose = TRUE,
-                       multithread = TRUE,
-                       bp_param = bpparam()) {
+                       verbose = TRUE) {
 
   N <- NA # Number of cells
   G <- NA # Number of genes
@@ -100,13 +100,6 @@ clonealign <- function(gene_expression_data,
   G <- ncol(Y)
 
 
-  # Parse size factors
-  # if(is.null(size_factors) && is(gene_expression_data, "SingleCellExperiment")) {
-  #   if(!is.null(BiocGenerics::sizeFactors(gene_expression_data))) {
-  #     size_factors <- BiocGenerics::sizeFactors(gene_expression_data)
-  #   }
-  # }
-
 
   # Parse cnv data
   if(is(copy_number_data, "data.frame") || is(copy_number_data, "DataFrame")) {
@@ -124,9 +117,14 @@ clonealign <- function(gene_expression_data,
   C <- ncol(L)
 
   # Sanity checking done - time to call em algorithm
-  tflow_res <- inference_tflow(
-    Y,
-    L)
+  tflow_res <- inference_tflow(Y,
+                               L,
+                               max_em_iter = max_em_iter,
+                               max_adam_iter = max_adam_iter,
+                               rel_em_tol = rel_em_tol,
+                               rel_adam_tol = rel_adam_tol,
+                               gene_filter_threshold = gene_filter_threshold,
+                               verbose = verbose)
 
   rlist <- list(
     clone = clone_assignment(tflow_res)
@@ -135,11 +133,12 @@ clonealign <- function(gene_expression_data,
   ml_params <- list(
     clone_probs = tflow_res$gamma,
     mu = tflow_res$mu,
-    beta = tflow_res$beta,
+    s = tflow_res$s,
     phi = tflow_res$phi
   )
 
   rlist$ml_params <- ml_params
+  rlist$log_lik <- tflow_res$log_lik
 
   # Finally map clone names back to fitted values
   clone_names <- colnames(L)
