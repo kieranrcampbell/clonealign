@@ -4,9 +4,9 @@
 \alias{clonealign}
 \title{Assign scRNA-seq to clone-of-origin}
 \usage{
-clonealign(gene_expression_data, copy_number_data, max_iter = 100,
-  rel_tol = 1e-05, gene_filter_threshold = 0, verbose = TRUE,
-  multithread = TRUE, bp_param = bpparam())
+clonealign(gene_expression_data, copy_number_data, max_iter_em = 50,
+  max_iter_adam = 200, rel_tol_em = 1e-06, rel_tol_adam = 1e-06,
+  gene_filter_threshold = 0, verbose = TRUE)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -15,23 +15,23 @@ clonealign(gene_expression_data, copy_number_data, max_iter = 100,
 \item{copy_number_data}{A matrix or data frame of copy number calls for each clone.
 See \code{details}.}
 
-\item{max_iter}{Maximum number of EM iterations before algorithm is terminated}
-
-\item{rel_tol}{Relative tolerance (change in log-likelihood per EM iteration in percent) below which the
-EM algorithm is considered converged}
-
 \item{gene_filter_threshold}{Genes with mean counts below or equal to this threshold will
 be filtered out (removes genes with no counts by default)}
 
 \item{verbose}{Should warnings and EM convergence information be printed? Default TRUE}
 
+\item{size_factors}{Vector of cell size factors. If NULL computed using
+\code{scran::computeSumFactors}}
+
+\item{max_iter}{Maximum number of EM iterations before algorithm is terminated}
+
+\item{rel_tol}{Relative tolerance (change in log-likelihood per EM iteration in percent) below which the
+EM algorithm is considered converged}
+
 \item{multithread}{Should the M-step be performed in parallel using \code{BiocParallel}? Default \code{TRUE}}
 
 \item{bp_param}{Parameters for parallel optimization of the Q function during EM. Default parameters
 taken by call to \code{bpparam()}. See \code{?bpparam} for more details.}
-
-\item{size_factors}{Vector of cell size factors. If NULL computed using
-\code{scran::computeSumFactors}}
 }
 \value{
 An object of class \code{clonealign_fit}. The maximum likelihood estimates of the

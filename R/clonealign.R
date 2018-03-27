@@ -73,10 +73,10 @@
 #' clones <- cal$clone
 clonealign <- function(gene_expression_data,
                        copy_number_data,
-                       max_em_iter = 50,
-                       max_adam_iter = 200,
-                       rel_tol_em = 1e-5,
-                       rel_tol_adam = 1e-5,
+                       max_iter_em = 50,
+                       max_iter_adam = 200,
+                       rel_tol_em = 1e-6,
+                       rel_tol_adam = 1e-6,
                        gene_filter_threshold = 0,
                        verbose = TRUE) {
 
@@ -119,10 +119,10 @@ clonealign <- function(gene_expression_data,
   # Sanity checking done - time to call em algorithm
   tflow_res <- inference_tflow(Y,
                                L,
-                               max_em_iter = max_em_iter,
-                               max_adam_iter = max_adam_iter,
-                               rel_em_tol = rel_em_tol,
-                               rel_adam_tol = rel_adam_tol,
+                               max_iter_em = max_iter_em,
+                               max_iter_adam = max_iter_adam,
+                               rel_tol_em= rel_tol_em,
+                               rel_tol_adam = rel_tol_adam,
                                gene_filter_threshold = gene_filter_threshold,
                                verbose = verbose)
 

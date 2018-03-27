@@ -20,10 +20,10 @@ round2 <- function(x) formatC(signif(x,digits=2), digits=2,format="fg", flag="#"
 #' @importFrom progress progress_bar
 inference_tflow <- function(Y_dat,
                             L_dat,
-                            max_em_iter = 50,
-                            rel_em_tol = 1e-5,
-                            max_adam_iter = 200,
-                            rel_adam_tol = 1e-6,
+                            max_iter_em = 50,
+                            max_iter_adam = 200,
+                            rel_tol_em = 1e-5,
+                            rel_tol_adam = 1e-6,
                             gene_filter_threshold = 0,
                             verbose = TRUE) {
 
@@ -54,11 +54,9 @@ inference_tflow <- function(Y_dat,
   mu_guess <- colMeans(data$Y / rowMeans(data$Y))
   mu_guess <- mu_guess[-1] / mu_guess[1]
 
-  beta_init <- rep(0.5, data$G)
-
   LOWER_BOUND <- 1e-10
 
-  s_init = rowMeans(data$Y)
+  s_init = rowSums(data$Y)
 
   if(verbose) {
     message("Creating Tensorflow graph...")
@@ -72,7 +70,7 @@ inference_tflow <- function(Y_dat,
 
   # Unconstrained variables
   mu_log <- tf$Variable(tf$constant(log(mu_guess)))
-  s_log <- tf$Variable(tf$constant(s_init))
+  s_log <- tf$Variable(tf$constant(log(s_init)))
   phi_log <- tf$Variable(tf$zeros(G))
 
   # Constrained variables
@@ -122,35 +120,34 @@ inference_tflow <- function(Y_dat,
 
   # Inference
   mu_final <- s_final <- phi_final <- NA
-  l <- NA
 
   sess <- tf$Session()
   init <- tf$global_variables_initializer()
 
   sess$run(init)
   fd <- dict(Y = Y_dat, L = L_dat)
-  LL <- sess$run(L_y, feed_dict = fd)
+  l <- LL <- sess$run(L_y, feed_dict = fd)
 
   LL_diff <- Inf
 
-  pb <- progress_bar$new(total = max_em_iter,
+  pb <- progress_bar$new(total = max_iter_em,
                          format = "  running EM [:bar] :percent | change in log-lik :change")
   pb$tick(0,tokens = list(change = glue("{LL_diff}%")))
 
-  for( i in seq_len(max_em_iter) ) {
+  for( i in seq_len(max_iter_em) ) {
 
     # E-step
     g <- sess$run(gamma, feed_dict = fd)
 
     # M-step
     gfd <- dict(Y = Y_dat, L = L_dat, gamma_fixed =  g)
-    l <- Q_old <- sess$run(Q, feed_dict = gfd)
+    Q_old <- sess$run(Q, feed_dict = gfd)
     Q_diff <- Inf
     pb$tick(tokens = list(change = glue("{round2(LL_diff)}%")))
 
     mi <- 0
 
-    while(mi < max_adam_iter && Q_diff > rel_adam_tol) {
+    while(mi < max_iter_adam && Q_diff > rel_tol_adam) {
       mi <- mi + 1
       sess$run(train, feed_dict = gfd)
       Q_new = sess$run(Q, feed_dict = dict(Y = data$Y, L = data$L, gamma_fixed = g))
@@ -159,23 +156,26 @@ inference_tflow <- function(Y_dat,
       Q_old <- Q_new
     }
 
-    if(mi == max_adam_iter) {
+    if(mi == max_iter_adam) {
       warning("Maximim number of ADAM iterations reached reached")
     }
 
     L_new <- sess$run(L_y, feed_dict = fd)
     LL_diff <- (L_new - LL)/abs(LL)
     # print(glue("EM iteration {i}\t New log-likelihood: {L_new}; Difference (%): {LL_diff}"))
-    l <- c(l, LL)
+    l <- c(l, L_new)
     LL <- L_new
 
 
-    if(LL_diff < rel_em_tol)
+    if(abs(LL_diff) < rel_tol_em)
       break
 
   }
 
-  rlist <- sess$run(list(mu, gamma, s, phi, l), feed_dict = fd)
+  sess$close()
+
+  rlist <- sess$run(list(mu, gamma, s, phi), feed_dict = fd)
+  rlist$l <- l
   names(rlist) <- c("mu", "gamma", "s", "phi", "log_lik")
 
   return(rlist)
