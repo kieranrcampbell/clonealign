@@ -1,16 +1,23 @@
 # clonealign
 
-`clonealign` assigns single-cells to their clones of origin by mapping RNA-seq to clone-specific copy number profiles. This is particularly useful when clones have been inferred using ultra-shallow single-cell DNA-seq meaning SNV analysis is not possible.
+`clonealign` assigns single-cell RNA-seq expression to cancer clones by mapping RNA-seq to clone-specific copy number profiles. This is particularly useful when clones have been inferred using ultra-shallow single-cell DNA-seq meaning SNV analysis is not possible.
 
 <div style="text-align:center">
-  <img src="inst/clonealign_figure.png" width="600" align="middle"/>
+  <img src="inst/clonealign_idea.png" width="500" align="middle"/>
 </div>
 
 ## Getting started
 
 ### Installation
 
-`clonealign` can be installed from github via
+`clonealign` is built using Google's Tensorflow so requires installation of the R package `tensorflow`:
+
+```r
+install.packages("tensorflow")
+tensorflow::install_tensorflow()
+```
+
+`clonealign` can then be installed from github:
 
 ```r
 install.packages("devtools") # If not already installed
