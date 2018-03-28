@@ -2,7 +2,6 @@
 
 S3method(print,clonealign_fit)
 export(clonealign)
-export(inference_tflow)
 import(tensorflow)
 importFrom(SummarizedExperiment,assay)
 importFrom(SummarizedExperiment,assays)

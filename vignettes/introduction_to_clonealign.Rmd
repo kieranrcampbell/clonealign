@@ -50,13 +50,13 @@ $$ \pi_n = c \text{ if cell $n$ on clone $c$} $$
 
 then `clonealign` models the conditional expected counts in a gene and cell as
 
-$$ E[y_{ng} | \pi_n] = \frac{\lambda_{g,\pi_n}}{\frac{1}{N} \sum_{g'} \lambda_{g,\pi_n}} s_n \mu_g $$
+$$ E[y_{ng} | \pi_n=c] = \frac{\lambda_{g,c} \mu_g}{ \sum_{g'}\lambda_{g',c} \mu_{g'}} s_n  $$
 
-where $s_n$ is a cell-specific size factor (calculated by default by `scran::computeSumFactors`) and $\mu_g$ is the "base" expression in an idealised monozygotic setting. The noise distribution is assumed to be negative-binomial. Inference is performed using expectation-maximization to find maximum likelihood estimates of the clone assignments $\pi_n$ and of all other model parameters.
+where $s_n$ is a cell-specific size factor and $\mu_g$ is the per-chromosome expression (normalized so that $\mu_1 = 1$ for model identifiability). The noise distribution is assumed to be negative-binomial. Inference is performed using expectation-maximization to find maximum likelihood estimates of the clone assignments $\pi_n$ and of all other model parameters.
 
 # Installation
 
-`clonealign` is built upon [Google's Tensorflow](https://www.tensorflow.org/) using the [Tensorflow R package provided by Rstudio]. To install `tensorflow`, run 
+`clonealign` is built upon [Google's Tensorflow](https://www.tensorflow.org/) using the [Tensorflow R package provided by Rstudio](https://tensorflow.rstudio.com/). To install `tensorflow`, run 
 
 ```{r, eval=FALSE}
 install.packages("tensorflow")

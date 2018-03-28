@@ -8,6 +8,15 @@ inference_tflow(Y_dat, L_dat, max_iter_em = 50, max_iter_adam = 200,
   rel_tol_em = 1e-05, rel_tol_adam = 1e-06, learning_rate = 0.1,
   gene_filter_threshold = 0, verbose = TRUE)
 }
+\arguments{
+\item{Y_dat}{Cell by gene matrix of counts}
+
+\item{L_dat}{Gene by clone matrix of copy number}
+}
+\value{
+A list of maximum likelihood parameter estimates and log likelihood values
+}
 \description{
 EM inference with tensorflow
 }
+\keyword{internal}

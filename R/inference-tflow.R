@@ -11,13 +11,21 @@ clone_assignment <- function(tflow_res) {
 
 #' Round a number to two significant figures
 #' @keywords internal
+#' @return  The rounded number
 round2 <- function(x) formatC(signif(x,digits=2), digits=2,format="fg", flag="#")
 
 #' EM inference with tensorflow
-#' @export
+#'
+#' @param Y_dat Cell by gene matrix of counts
+#' @param L_dat Gene by clone matrix of copy number
+#'
 #' @importFrom glue glue
 #' @import tensorflow
 #' @importFrom progress progress_bar
+#'
+#' @keywords internal
+#'
+#' @return A list of maximum likelihood parameter estimates and log likelihood values
 inference_tflow <- function(Y_dat,
                             L_dat,
                             max_iter_em = 50,

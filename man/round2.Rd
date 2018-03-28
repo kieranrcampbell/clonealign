@@ -6,6 +6,9 @@
 \usage{
 round2(x)
 }
+\value{
+The rounded number
+}
 \description{
 Round a number to two significant figures
 }

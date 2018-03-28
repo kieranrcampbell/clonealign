@@ -6,9 +6,7 @@ Description: clonealign assigns single-cell RNA-seq to clones of origin based on
 Depends: R (>= 3.4.0)
 Imports:
   methods,
-  stats,
   glue,
-  matrixStats,
   plyr,
   SummarizedExperiment,
   tensorflow,
