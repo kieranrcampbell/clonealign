@@ -24,6 +24,7 @@ inference_tflow <- function(Y_dat,
                             max_iter_adam = 200,
                             rel_tol_em = 1e-5,
                             rel_tol_adam = 1e-6,
+                            learning_rate = 0.1,
                             gene_filter_threshold = 0,
                             verbose = TRUE) {
 
@@ -172,10 +173,19 @@ inference_tflow <- function(Y_dat,
 
   }
 
-  sess$close()
+  pb$tick(100, tokens = list(change = glue("{round2(LL_diff)}%")))
+
+  if(verbose) {
+    message("clonealign inference complete")
+  }
 
   rlist <- sess$run(list(mu, gamma, s, phi), feed_dict = fd)
+
+  # Close the tensorflow session
+  sess$close()
+
   rlist$l <- l
+
   names(rlist) <- c("mu", "gamma", "s", "phi", "log_lik")
 
   return(rlist)

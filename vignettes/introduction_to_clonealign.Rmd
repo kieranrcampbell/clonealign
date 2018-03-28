@@ -7,8 +7,9 @@ author:
     - Department of Statistics, University of British Columbia
     - Department of Molecular Oncology, BC Cancer Agency
   email: kicampbell@bccrc.ca
-date: "January 2018"
+date: "March 2018"
 package: clonealign
+bibliography: bibliography.bib
 output: 
   BiocStyle::html_document
 vignette: >
@@ -52,6 +53,33 @@ then `clonealign` models the conditional expected counts in a gene and cell as
 $$ E[y_{ng} | \pi_n] = \frac{\lambda_{g,\pi_n}}{\frac{1}{N} \sum_{g'} \lambda_{g,\pi_n}} s_n \mu_g $$
 
 where $s_n$ is a cell-specific size factor (calculated by default by `scran::computeSumFactors`) and $\mu_g$ is the "base" expression in an idealised monozygotic setting. The noise distribution is assumed to be negative-binomial. Inference is performed using expectation-maximization to find maximum likelihood estimates of the clone assignments $\pi_n$ and of all other model parameters.
+
+# Installation
+
+`clonealign` is built upon [Google's Tensorflow](https://www.tensorflow.org/) using the [Tensorflow R package provided by Rstudio]. To install `tensorflow`, run 
+
+```{r, eval=FALSE}
+install.packages("tensorflow")
+library(tensorflow)
+install_tensorflow()
+```
+
+You can confirm the installation succeeded by running
+
+```{r,eval=FALSE}
+sess = tf$Session()
+hello <- tf$constant('Hello, TensorFlow!')
+sess$run(hello)
+```
+
+For more details see the [Rstudio page on tensorflow installation](https://tensorflow.rstudio.com/tensorflow/articles/installation.html).
+
+`clonealign` can then be installed using the `devtools` package via
+
+```{r, eval=FALSE}
+devtools::install_github("kieranrcampbell/clonealign")
+```
+
  
 # Basic usage
 
@@ -99,6 +127,12 @@ cal <- clonealign(example_sce, cnv_data)
 print(cal)
 ```
 
+We can plot the marginal likelihood values to ensure convergence:
+
+```{r}
+qplot(seq_along(cal$log_lik), cal$log_lik, geom = c("point", "line")) +
+  labs(x = "Iteration", y = "Log-marginal-likelihood")
+```
 
 The maximum likelihood estimates of the clone assignments can be access through the `clone` slot:
 
@@ -110,7 +144,6 @@ table(clones)
 This can easily be added to the `SingleCellExperiment` for visualization with `scater`:
 
 ```{r}
-library(scater)
 example_sce$clone <- clones
 example_sce <- normaliseExprs(example_sce)
 plotPCA(example_sce, ncomponents = 3, colour_by = "clone")
@@ -125,15 +158,18 @@ The clone assignments in `clones` can then be used for the desired downstream an
 
 Inference is performed using the [EM algorithm](https://en.wikipedia.org/wiki/Expectation-maximization_algorithm)
 which uses the log marginal likelihood to monitor convergence. This is controlled using the
-`rel_tol` parameter. When the difference 
+`rel_tol_em` parameter. When the difference 
 
 $$ \Delta L = \frac{L_{\text{new}} - L_{\text{old}}}{|L_{\text{old}}|} $$
-falls below `rel_tol`, the EM algorithm is considered converged.
-The maximum number of iterations to acheive this is set using the `max_iter` parameter.
+falls below `rel_tol_em`, the EM algorithm is considered converged. The maximum number of iterations to acheive this is set using the `max_iter_em` parameter.
 
-## Multithreaded options
+The M-step uses Adam optimization (@kingma2014adam) which is controlled by three parameters:
 
-The M-step of the EM algorithm consists of $G$ different optimizations for $G$ genes. These optimizations are performed in parallel using the BiocParallel package. The parallel computations are controlled using the `bp_param` argument. For fine control over this see the `bpparam` function. By default clonealign uses the parameters that are returned by a call to `bpparam()`. To use only e.g. 1 core call `clonealign` with `clonealign(..., bp_param = MulticoreParam(workers = 1))`.
+* `learning_rate` the learning rate
+* `rel_tol_adam` the relative difference in the $Q$-function value below which the M-step will be considered converged
+* `max_iter_adam` the maximum number of Adam iterations to perform at each M-step
+
+Note that if the parameter values are close to the stationary point the marginal log-likelihood may decrease if the optimization step size doesn't decrease fast enough. This will generally lead to valid results, but decreasing the `learning_rate` parameter may help.
 
 ## Accessing maximum-likelihood parameter estimates
 
@@ -152,10 +188,10 @@ head(cal$ml_params$clone_probs)
 while `mu` and `phi` give the maximum likelihood estimates of the $\mu$ and $\phi$ parameters from the model.
 
 
-
 # Technical
 
 ```{r}
 sessionInfo()
 ```
 
+# References

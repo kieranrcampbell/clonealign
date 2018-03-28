@@ -9,8 +9,6 @@ Imports:
   stats,
   glue,
   matrixStats,
-  BiocParallel,
-  BiocGenerics,
   plyr,
   SummarizedExperiment,
   tensorflow,

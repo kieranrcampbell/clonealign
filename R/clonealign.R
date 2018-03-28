@@ -9,19 +9,17 @@
 #' \code{SingleCellExperiment}. This should contain raw counts. See \code{details}.
 #' @param copy_number_data A matrix or data frame of copy number calls for each clone.
 #' See \code{details}.
-#' @param size_factors Vector of cell size factors. If NULL computed using
-#' \code{scran::computeSumFactors}
-#' @param max_iter Maximum number of EM iterations before algorithm is terminated
-#' @param rel_tol Relative tolerance (change in log-likelihood per EM iteration in percent) below which the
+#' @param rel_tol_em Relative tolerance (change in log-likelihood per EM iteration in percent) below which the
 #' EM algorithm is considered converged
+#' @param max_iter_em Maximum number of EM iterations to perform
+#' @param rel_tol_adam The relative tolerance for each Adam update in the M-step below which the
+#' maximization will be considered converged
+#' @param max_iter_adam The maximum number of Adam iterations to perform in each M-step
 #' @param gene_filter_threshold Genes with mean counts below or equal to this threshold will
 #' be filtered out (removes genes with no counts by default)
+#' @param learning_rate The learning rate to be passed to the Adam optimizer
 #' @param verbose Should warnings and EM convergence information be printed? Default TRUE
-#' @param multithread Should the M-step be performed in parallel using \code{BiocParallel}? Default \code{TRUE}
-#' @param bp_param Parameters for parallel optimization of the Q function during EM. Default parameters
-#' taken by call to \code{bpparam()}. See \code{?bpparam} for more details.
 #'
-#' @importFrom BiocParallel bpparam
 #'
 #' @details
 #' \strong{Input format}
@@ -35,25 +33,18 @@
 #' If \code{colnames(copy_number_data)} is not \code{NULL} then these names will be used for each of
 #' the clones in the final output.
 #'
-#' \code{size_factors} should be a vector of size factors (one for each cell in \code{gene_expression_data}).
-#' If \code{NULL} these are computed using \code{scran::computeSumFactors}.
 #'
-#' \strong{EM convergence monitoring}
+#' \strong{Controlling the EM algorithm}
 #'
 #' Inference is performed using the EM algorithm (\url{https://en.wikipedia.org/wiki/Expectation-maximization_algorithm})
 #' which uses the log marginal likelihood to monitor convergence. This is controlled using the
-#' \code{rel_tol} parameter. When the difference between the new and old log marginal likelihoods normalized
-#' by the absolute value of the old falls below \code{rel_tol}, the EM algorithm is considered converged.
-#' The maximum number of iterations to acheive this is set using the \code{max_iter} parameter.
+#' \code{rel_tol_em} parameter. When the difference between the new and old log marginal likelihoods normalized
+#' by the absolute value of the old falls below \code{rel_tol_em}, the EM algorithm is considered converged.
+#' The maximum number of iterations to acheive this is set using the \code{max_iter_em} parameter.
 #'
-#' \strong{Multithreaded optimization}
-#'
-#' The M-step of the EM algorithm consists of \eqn{G} different optimizations for \eqn{G} genes. These optimizations
-#' are performed in parallel using the \code{BiocParallel} package. The parallel
-#' computations are controlled using the \code{bp_param} argument. For fine control over this see
-#' the \code{\link[BiocParallel]{bpparam}} function. By default \code{clonealign} uses the parameters
-#' that are returned by a call to \code{bpparam()}. To use only e.g. 1 core call \code{clonealign} with
-#' \code{clonealign(..., bp_param = MulticoreParam(workers = 1))}.
+#' In each M-step, maximization is performed using Adam, with learning rate given by \code{learning_rate}. Each M-step
+#' is considered converged with the value of the Q function falls below \code{rel_tol_adam} with a maximum number of iterations
+#' \code{max_iter_adam}.
 #'
 #' @return An object of class \code{clonealign_fit}. The maximum likelihood estimates of the
 #' clone assignment paramters are in the \code{clone} slot. Maximum likelihood estimates of
@@ -78,6 +69,7 @@ clonealign <- function(gene_expression_data,
                        rel_tol_em = 1e-6,
                        rel_tol_adam = 1e-6,
                        gene_filter_threshold = 0,
+                       learning_rate = 0.1,
                        verbose = TRUE) {
 
   N <- NA # Number of cells
@@ -123,6 +115,7 @@ clonealign <- function(gene_expression_data,
                                max_iter_adam = max_iter_adam,
                                rel_tol_em= rel_tol_em,
                                rel_tol_adam = rel_tol_adam,
+                               learning_rate = learning_rate,
                                gene_filter_threshold = gene_filter_threshold,
                                verbose = verbose)
 
