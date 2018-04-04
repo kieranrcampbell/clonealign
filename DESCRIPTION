@@ -10,7 +10,8 @@ Imports:
   plyr,
   SummarizedExperiment,
   tensorflow,
-  progress
+  progress,
+  reticulate
 Suggests:
   BiocStyle,
   SingleCellExperiment,
@@ -24,7 +25,7 @@ biocViews:
   GeneExpression, 
   RNASeq,
   SingleCell
-License: License: Apache License (== 2.0)
+License: Apache License (== 2.0) | file LICENSE
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 6.0.1

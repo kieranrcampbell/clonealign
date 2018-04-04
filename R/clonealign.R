@@ -132,6 +132,7 @@ clonealign <- function(gene_expression_data,
 
   rlist$ml_params <- ml_params
   rlist$log_lik <- tflow_res$log_lik
+  rlist$retained_genes <- tflow_res$retained_genes
 
   # Finally map clone names back to fitted values
   clone_names <- colnames(L)
@@ -191,5 +192,14 @@ print.clonealign_fit <- function(x, ...) {
 #' @examples
 #' data(example_clonealign_fit)
 "example_clonealign_fit"
+
+.onLoad <- function(libpath, pkgname) {
+  if(!reticulate::py_module_available("tensorflow")) {
+    msg <- "Tensorflow does not appear to be installed\n"
+    msg <- c(msg, "To install run install.pacakges(\"tensorflow\") then tensorflow::install_tensorflow()\n")
+    msg <- c(msg, "For more details see the clonealign vignette or https://tensorflow.rstudio.com/tensorflow/articles/installation.html")
+    stop(msg)
+  }
+}
 
 

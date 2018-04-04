@@ -36,6 +36,14 @@ inference_tflow <- function(Y_dat,
                             gene_filter_threshold = 0,
                             verbose = TRUE) {
 
+  # Do a first check that we actually have tensorflow support
+  if(!reticulate::py_module_available("tensorflow")) {
+    msg <- "Tensorflow does not appear to be installed\n"
+    msg <- c(msg, "To install run install.pacakges(\"tensorflow\") then tensorflow::install_tensorflow()\n")
+    msg <- c(msg, "For more details see the clonealign vignette or https://tensorflow.rstudio.com/tensorflow/articles/installation.html")
+    stop(msg)
+  }
+
   zero_gene_means <- colMeans(Y_dat) <= gene_filter_threshold
 
   if(verbose) {
@@ -44,6 +52,13 @@ inference_tflow <- function(Y_dat,
 
   Y_dat <- Y_dat[, !zero_gene_means]
   L_dat <- L_dat[!zero_gene_means,]
+
+  retained_genes <- NULL
+  if(!is.null(colnames(Y_dat))) {
+    retained_genes <- colnames(Y_dat)
+  } else {
+    retained_genes <- which(!zero_gene_means)
+  }
 
   N <- nrow(Y_dat)
   G <- ncol(Y_dat)
@@ -195,6 +210,8 @@ inference_tflow <- function(Y_dat,
   rlist$l <- l
 
   names(rlist) <- c("mu", "gamma", "s", "phi", "log_lik")
+
+  rlist$retained_genes <- retained_genes
 
   return(rlist)
 }
