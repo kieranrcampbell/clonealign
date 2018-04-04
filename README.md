@@ -1,5 +1,7 @@
 # clonealign
 
+[![Build Status](https://travis-ci.org/kieranrcampbell/clonealign.svg?branch=master)](https://travis-ci.org/kieranrcampbell/clonealign)
+
 `clonealign` assigns single-cell RNA-seq expression to cancer clones by mapping RNA-seq to clone-specific copy number profiles. This is particularly useful when clones have been inferred using ultra-shallow single-cell DNA-seq meaning SNV analysis is not possible.
 
 <div style="text-align:center">
