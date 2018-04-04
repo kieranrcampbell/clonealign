@@ -5,6 +5,7 @@ dist: trusty
 r: bioc-devel
 
 r_packages:
+  - devtools
   - tensorflow
   - rmarkdown
 
