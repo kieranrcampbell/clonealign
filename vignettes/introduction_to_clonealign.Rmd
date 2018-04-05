@@ -7,7 +7,7 @@ author:
     - Department of Statistics, University of British Columbia
     - Department of Molecular Oncology, BC Cancer Agency
   email: kicampbell@bccrc.ca
-date: "March 2018"
+date: "April 2018"
 package: clonealign
 bibliography: bibliography.bib
 output: 
@@ -22,13 +22,15 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
-  cache = TRUE
+  cache = FALSE
 )
 
 
-library(SingleCellExperiment)
-library(scater)
-
+suppressPackageStartupMessages({
+  library(SingleCellExperiment)
+  library(scater)
+  library(dplyr)
+})
 ```
 
 
@@ -150,6 +152,48 @@ plotPCA(example_sce, ncomponents = 3, colour_by = "clone")
 ```
 
 The clone assignments in `clones` can then be used for the desired downstream analysis, such as differential expression or SNV analysis.
+
+## Plotting results
+
+The `plot_clonealign` function can be used to check the sanity of the fitted clones by ensuring that gene expression does correlate to the inferred copy number. For this we require the input `SingleCellExperiment`, copy number matrix, and clone assignments. Note that the `SingleCellExperiment` requires columns in `rowData` corresponding to the chromosome, start and end position of each feature (gene). These can conveniently be gathered using the `getBMFeatureAnnos` function in `scater`, e.g.
+
+```{r, eval = FALSE}
+sce <- getBMFeatureAnnos(sce, filters = "ensembl_gene_id",
+                         attributes = c("ensembl_gene_id", "start_position", "end_position"),
+                         feature_symbol = "hgnc_symbol",
+                         feature_id = "ensembl_gene_id",
+                         dataset = "hsapiens_gene_ensembl")
+```
+
+For now we'll set these to made-up values:
+
+```{r}
+gene_position <- as_data_frame(cnv_data) %>% 
+  mutate(gene = seq_len(nrow(cnv_data))) %>% 
+  arrange(A, B, C) %>% 
+  mutate(position = seq_len(nrow(cnv_data))) %>% 
+  arrange(gene) %>% 
+  .$position
+
+rowData(example_sce)$chromosome <- "1"
+rowData(example_sce)$start_pos <- gene_position
+rowData(example_sce)$end_pos <- gene_position
+```
+
+We can then plot the expression estimates using the `plot_clonealign` function:
+
+```{r}
+plot_clonealign(example_sce, cal$clone, cnv_data,
+                chromosome = "1",
+                chr_str = "chromosome",
+                start_str = "start_pos",
+                end_str = "end_pos")
+```
+
+where the `*_str` identifies the columns of `rowData(example_sce)` to look for the chromosome names and feature start and end positions.
+
+
+
 
 # Advanced options
 

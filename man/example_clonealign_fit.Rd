@@ -4,7 +4,7 @@
 \name{example_clonealign_fit}
 \alias{example_clonealign_fit}
 \title{Example clonealign_fit}
-\format{An object of class \code{clonealign_fit} of length 2.}
+\format{An object of class \code{clonealign_fit} of length 4.}
 \usage{
 example_clonealign_fit
 }

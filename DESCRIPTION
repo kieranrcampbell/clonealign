@@ -6,19 +6,23 @@ Description: clonealign assigns single-cell RNA-seq to clones of origin based on
 Depends: R (>= 3.4.0)
 Imports:
   methods,
+  stats,
   glue,
   plyr,
   SummarizedExperiment,
   tensorflow,
   progress,
-  reticulate
+  reticulate,
+  ggplot2,
+  dplyr
 Suggests:
   BiocStyle,
-  SingleCellExperiment,
   knitr,
   rmarkdown,
   scater,
-  testthat
+  testthat,
+  cowplot,
+  tidyr
 biocViews:
   Software, 
   Transcriptomics, 
