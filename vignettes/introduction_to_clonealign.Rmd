@@ -147,7 +147,7 @@ This can easily be added to the `SingleCellExperiment` for visualization with `s
 
 ```{r}
 example_sce$clone <- clones
-example_sce <- normaliseExprs(example_sce)
+example_sce <- normalise(example_sce)
 plotPCA(example_sce, ncomponents = 3, colour_by = "clone")
 ```
 
