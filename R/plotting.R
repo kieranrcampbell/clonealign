@@ -196,6 +196,8 @@ plot_clonealign <- function(sce, clones, cnv_data, chromosome = "1",
 
   gex_df <- dplyr::inner_join(gex_df, mean_sd_df, by = "ensembl_gene_id")
 
+  gex_df$sd_exprs[gex_df$sd_exprs == 0] <- 1
+
   gex_df <- dplyr::mutate(gex_df, z_score_expression = (expression - mean_exprs) / sd_exprs)
 
   # gex_df currently normalised z-score values
