@@ -123,21 +123,21 @@ plot_clonealign <- function(sce, clones, cnv_data, chromosome = "1",
   }
 
   # CNV data
-  cnv_df <- rowData(sce)[,c("ensembl_gene_id", start_str, end_str)]
-  cnv_df$position <- (cnv_df[[start_str]] + cnv_df[[end_str]])/2
+  cnv_df <- as.data.frame(rowData(sce)[,c("ensembl_gene_id", start_str, end_str)])
+  cnv_df$rank_position <- rank((cnv_df[[start_str]] + cnv_df[[end_str]])/2)
 
   cnv_df <- cbind(cnv_df, cnv_data) %>%
     as.data.frame()
 
   cnv_df[[start_str]] <- cnv_df[[end_str]] <- NULL
-  cnv_df <- tidyr::gather(cnv_df, clone, copy_number, -ensembl_gene_id, -position)
+  # cnv_df <- tidyr::gather(cnv_df, clone, copy_number, -ensembl_gene_id, -rank_position)
 
 
-  cnv_df <- dplyr::mutate(cnv_df, rank_position = rank(position))
+  # cnv_df <- dplyr::mutate(cnv_df, rank_position = rank(position))
 
   # working out regions
 
-  cnv_spread <- tidyr::spread(cnv_df, clone, copy_number)
+  cnv_spread <- cnv_df# tidyr::spread(cnv_df, clone, copy_number)
   cnv_spread <- dplyr::arrange(cnv_spread, rank_position)
   cnv_spread_clones <- cnv_spread[,clone_names]
 
@@ -156,7 +156,7 @@ plot_clonealign <- function(sce, clones, cnv_data, chromosome = "1",
 
   cnv_spread$state <- state
 
-  cnv_df_2_u_grp <- tidyr::gather(cnv_spread, clone, copy_number, -ensembl_gene_id, -position, -rank_position, -state)
+  cnv_df_2_u_grp <- tidyr::gather(cnv_spread, clone, copy_number, -ensembl_gene_id, -rank_position, -state)
 
   # Need to work out start and end of each region
   cnv_df_2 <- dplyr::group_by(cnv_df_2_u_grp, state, clone, copy_number) %>%
@@ -224,7 +224,7 @@ plot_clonealign <- function(sce, clones, cnv_data, chromosome = "1",
     labs(x = "Genomic position", y = "Gene expression", subtitle = "scRNA-seq") +
     geom_segment(data = df_seg,
                  aes(x = start-1, xend = end+1, y = per_clone_state_z_score, yend = per_clone_state_z_score),
-                 size = 1.8) +
+                 size = 1.2) +
     scale_y_continuous(labels=scaleFUN)
 
   cowplot::plot_grid(rna_plot, dna_plot, ncol = 1, align = 'v')
