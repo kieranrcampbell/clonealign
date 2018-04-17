@@ -32,6 +32,6 @@ addons:
       - libv8-dev
 
 before_install:
-  - pip install --user --upgrade pip
+  - python -m pip install --user --upgrade pip
   - pip install --user numpy
   - pip install --user tensorflow
