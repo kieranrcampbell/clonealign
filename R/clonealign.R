@@ -127,7 +127,8 @@ clonealign <- function(gene_expression_data,
     clone_probs = tflow_res$gamma,
     mu = tflow_res$mu,
     s = tflow_res$s,
-    phi = tflow_res$phi
+    phi = tflow_res$phi,
+    alpha = tflow_res$alpha
   )
 
   rlist$ml_params <- ml_params

@@ -96,6 +96,17 @@ inference_tflow <- function(Y_dat,
   mu_log <- tf$Variable(tf$constant(log(mu_guess)))
   s_log <- tf$Variable(tf$constant(log(s_init)))
   phi_log <- tf$Variable(tf$zeros(G))
+  alpha_unconstr <- tf$Variable(tf$zeros(C))#tf$constant(rep(log(1/(C-1)), C-1)))
+
+  # alpha_end <- tf$log1p(-tf$exp(tf$reduce_logsumexp(alpha_unconstr)))
+  # alpha_end <- tf$reshape(alpha_end, shape(1L))
+  #
+  # tlist <- list(tf$log_sigmoid(alpha_unconstr),
+  #               alpha_end)
+  # log_alpha <- tf$concat(tlist, axis = 0L)
+
+  log_alpha <- tf$nn$log_softmax(alpha_unconstr)
+
 
   # Constrained variables
   mu <- tf$concat( list(tf$constant(matrix(1.0), dtype = tf$float32),
@@ -125,6 +136,8 @@ inference_tflow <- function(Y_dat,
   y_log_prob <- y_pdf$log_prob(Y_tiled)
 
   p_y_on_c <- tf$reduce_sum(y_log_prob, 2L)
+  p_y_on_c <- p_y_on_c + log_alpha
+
 
   p_y_on_c_norm <- tf$reshape(tf$reduce_logsumexp(p_y_on_c, 1L), c(1L, -1L))
 
@@ -133,8 +146,10 @@ inference_tflow <- function(Y_dat,
   # Q function
   gamma_fixed <- tf$placeholder(dtype = tf$float32, shape = c(N, C))
 
-  Q_g <- tf$einsum('nc,ncg->g', gamma_fixed, y_log_prob)
-  Q <- -(tf$reduce_sum(Q_g))
+  y_log_prob_g_sum <- tf$reduce_sum(y_log_prob, 2L) + log_alpha
+
+  Q <- -tf$einsum('nc,nc->', gamma_fixed, y_log_prob_g_sum)
+  # Q <- -(tf$reduce_sum(Q_g))
 
   optimizer <- tf$train$AdamOptimizer(learning_rate = 0.1)
   train <- optimizer$minimize(Q)
@@ -177,6 +192,8 @@ inference_tflow <- function(Y_dat,
       Q_new = sess$run(Q, feed_dict = dict(Y = data$Y, L = data$L, gamma_fixed = g))
       Q_diff = -(Q_new - Q_old) / abs(Q_old)
 
+      # print(Q_new)
+
       Q_old <- Q_new
     }
 
@@ -202,14 +219,14 @@ inference_tflow <- function(Y_dat,
     message("clonealign inference complete")
   }
 
-  rlist <- sess$run(list(mu, gamma, s, phi), feed_dict = fd)
+  rlist <- sess$run(list(mu, gamma, s, phi, tf$exp(log_alpha)), feed_dict = fd)
 
   # Close the tensorflow session
   sess$close()
 
   rlist$l <- l
 
-  names(rlist) <- c("mu", "gamma", "s", "phi", "log_lik")
+  names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "log_lik")
 
   rlist$retained_genes <- retained_genes
 
