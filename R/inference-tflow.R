@@ -32,8 +32,9 @@ inference_tflow <- function(Y_dat,
                             max_iter_adam = 200,
                             rel_tol_em = 1e-5,
                             rel_tol_adam = 1e-6,
-                            learning_rate = 0.1,
+                            learning_rate = 1e-3,
                             gene_filter_threshold = 0,
+                            fix_alpha = FALSE,
                             verbose = TRUE) {
 
   # Do a first check that we actually have tensorflow support
@@ -96,16 +97,16 @@ inference_tflow <- function(Y_dat,
   mu_log <- tf$Variable(tf$constant(log(mu_guess)))
   s_log <- tf$Variable(tf$constant(log(s_init)))
   phi_log <- tf$Variable(tf$zeros(G))
-  alpha_unconstr <- tf$Variable(tf$zeros(C))#tf$constant(rep(log(1/(C-1)), C-1)))
 
-  # alpha_end <- tf$log1p(-tf$exp(tf$reduce_logsumexp(alpha_unconstr)))
-  # alpha_end <- tf$reshape(alpha_end, shape(1L))
-  #
-  # tlist <- list(tf$log_sigmoid(alpha_unconstr),
-  #               alpha_end)
-  # log_alpha <- tf$concat(tlist, axis = 0L)
+  log_alpha <- NULL
 
-  log_alpha <- tf$nn$log_softmax(alpha_unconstr)
+  if(!fix_alpha) {
+    alpha_unconstr_0 <- tf$Variable(tf$zeros(C-1))
+    alpha_unconstr <- tf$concat(list(alpha_unconstr_0, tf$constant(0, dtype = tf$float32, shape = shape(1))), axis = 0L)
+    log_alpha <- tf$nn$log_softmax(alpha_unconstr)
+  } else {
+    log_alpha <- tf$constant(rep(-log(C), C))
+  }
 
 
   # Constrained variables
@@ -151,10 +152,10 @@ inference_tflow <- function(Y_dat,
   Q <- -tf$einsum('nc,nc->', gamma_fixed, y_log_prob_g_sum)
   # Q <- -(tf$reduce_sum(Q_g))
 
-  optimizer <- tf$train$AdamOptimizer(learning_rate = 0.1)
+  optimizer <- tf$train$AdamOptimizer(learning_rate = learning_rate)
   train <- optimizer$minimize(Q)
 
-  eta_y <- tf$reduce_sum(y_log_prob, 2L)
+  eta_y <- y_log_prob_g_sum#tf$reduce_sum(y_log_prob, 2L)
   L_y <- tf$reduce_sum(tf$reduce_logsumexp(eta_y, 1L))
 
   # Inference
@@ -172,6 +173,8 @@ inference_tflow <- function(Y_dat,
   pb <- progress_bar$new(total = max_iter_em,
                          format = "  running EM [:bar] :percent | change in log-lik :change")
   pb$tick(0,tokens = list(change = glue("{LL_diff}%")))
+
+
 
   for( i in seq_len(max_iter_em) ) {
 
@@ -193,6 +196,7 @@ inference_tflow <- function(Y_dat,
       Q_diff = -(Q_new - Q_old) / abs(Q_old)
 
       # print(Q_new)
+      # print(Q_diff)
 
       Q_old <- Q_new
     }

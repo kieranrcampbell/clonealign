@@ -69,7 +69,8 @@ clonealign <- function(gene_expression_data,
                        rel_tol_em = 1e-6,
                        rel_tol_adam = 1e-6,
                        gene_filter_threshold = 0,
-                       learning_rate = 0.1,
+                       learning_rate = 1e-1,
+                       fix_alpha = FALSE,
                        verbose = TRUE) {
 
   N <- NA # Number of cells
@@ -117,6 +118,7 @@ clonealign <- function(gene_expression_data,
                                rel_tol_adam = rel_tol_adam,
                                learning_rate = learning_rate,
                                gene_filter_threshold = gene_filter_threshold,
+                               fix_alpha = fix_alpha,
                                verbose = verbose)
 
   rlist <- list(
