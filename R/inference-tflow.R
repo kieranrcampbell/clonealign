@@ -96,7 +96,7 @@ inference_tflow <- function(Y_dat,
   # Unconstrained variables
   mu_log <- tf$Variable(tf$constant(log(mu_guess)))
   s_log <- tf$Variable(tf$constant(log(s_init)))
-  phi_log <- tf$Variable(tf$zeros(G))
+  phi_log <- tf$Variable(tf$zeros(shape(C,G)))
 
   log_alpha <- NULL
 
