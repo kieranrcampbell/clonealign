@@ -18,6 +18,8 @@
 #' @param gene_filter_threshold Genes with mean counts below or equal to this threshold will
 #' be filtered out (removes genes with no counts by default)
 #' @param learning_rate The learning rate to be passed to the Adam optimizer
+#' @param fix_alpha Should the underlying priors for clone frequencies be fixed? Default FALSE
+#' (values are inferred from the data)
 #' @param verbose Should warnings and EM convergence information be printed? Default TRUE
 #'
 #'

@@ -6,7 +6,8 @@
 \usage{
 clonealign(gene_expression_data, copy_number_data, max_iter_em = 50,
   max_iter_adam = 200, rel_tol_em = 1e-06, rel_tol_adam = 1e-06,
-  gene_filter_threshold = 0, learning_rate = 0.1, verbose = TRUE)
+  gene_filter_threshold = 0, learning_rate = 0.1, fix_alpha = FALSE,
+  verbose = TRUE)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -29,6 +30,9 @@ maximization will be considered converged}
 be filtered out (removes genes with no counts by default)}
 
 \item{learning_rate}{The learning rate to be passed to the Adam optimizer}
+
+\item{fix_alpha}{Should the underlying priors for clone frequencies be fixed? Default FALSE
+(values are inferred from the data)}
 
 \item{verbose}{Should warnings and EM convergence information be printed? Default TRUE}
 }

@@ -28,7 +28,8 @@ test_that("clonealign(...) returns a valid object", {
 
   expect_equal(G, length(cal$ml_params$mu))
 
-  expect_equal(G, length(cal$ml_params$phi))
+  expect_equal(G, ncol(cal$ml_params$phi))
 
+  expect_equal(C, nrow(cal$ml_params$phi))
 
 })
