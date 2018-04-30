@@ -73,6 +73,7 @@ clonealign <- function(gene_expression_data,
                        gene_filter_threshold = 0,
                        learning_rate = 1e-1,
                        fix_alpha = FALSE,
+                       clone_specific_phi = TRUE,
                        verbose = TRUE) {
 
   N <- NA # Number of cells
@@ -121,6 +122,7 @@ clonealign <- function(gene_expression_data,
                                learning_rate = learning_rate,
                                gene_filter_threshold = gene_filter_threshold,
                                fix_alpha = fix_alpha,
+                               clone_specific_phi = clone_specific_phi,
                                verbose = verbose)
 
   rlist <- list(
@@ -132,7 +134,9 @@ clonealign <- function(gene_expression_data,
     mu = tflow_res$mu,
     s = tflow_res$s,
     phi = tflow_res$phi,
-    alpha = tflow_res$alpha
+    alpha = tflow_res$alpha,
+    phi_bar = tflow_res$phi_bar,
+    sigma = tflow_res$sigma
   )
 
   rlist$ml_params <- ml_params

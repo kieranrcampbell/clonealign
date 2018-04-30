@@ -35,6 +35,7 @@ inference_tflow <- function(Y_dat,
                             learning_rate = 1e-3,
                             gene_filter_threshold = 0,
                             fix_alpha = FALSE,
+                            clone_specific_phi = TRUE,
                             verbose = TRUE) {
 
   # Do a first check that we actually have tensorflow support
@@ -95,8 +96,21 @@ inference_tflow <- function(Y_dat,
 
   # Unconstrained variables
   mu_log <- tf$Variable(tf$constant(log(mu_guess)))
+
   s_log <- tf$Variable(tf$constant(log(s_init)))
-  phi_log <- tf$Variable(tf$zeros(shape(C,G)))
+
+  phi_log <- NULL
+  if(clone_specific_phi) {
+    phi_log <- tf$Variable(tf$zeros(shape(C,G)))
+  } else {
+    phi_log <- tf$Variable(tf$zeros(shape(G)))
+  }
+
+  # Variance shrinkage variables
+  phi_bar <- tf$Variable(tf$ones(G))
+  sigma_log <- tf$Variable(tf$ones(1))
+  # sigma_log <- tf$zeros(1L)
+
 
   log_alpha <- NULL
 
@@ -144,19 +158,22 @@ inference_tflow <- function(Y_dat,
 
   gamma <- tf$exp(tf$transpose(tf$transpose(p_y_on_c) - p_y_on_c_norm))
 
+  # Prior on phi
+  phi_pdf <- tf$contrib$distributions$Normal(loc = phi_bar, scale = tf$exp(sigma_log))
+  p_phi <- phi_pdf$log_prob(tf$log(phi))
+
   # Q function
   gamma_fixed <- tf$placeholder(dtype = tf$float32, shape = c(N, C))
 
   y_log_prob_g_sum <- tf$reduce_sum(y_log_prob, 2L) + log_alpha
 
-  Q <- -tf$einsum('nc,nc->', gamma_fixed, y_log_prob_g_sum)
-  # Q <- -(tf$reduce_sum(Q_g))
+  Q <- -tf$einsum('nc,nc->', gamma_fixed, y_log_prob_g_sum) - tf$reduce_sum(p_phi)
 
   optimizer <- tf$train$AdamOptimizer(learning_rate = learning_rate)
   train <- optimizer$minimize(Q)
 
   eta_y <- y_log_prob_g_sum#tf$reduce_sum(y_log_prob, 2L)
-  L_y <- tf$reduce_sum(tf$reduce_logsumexp(eta_y, 1L))
+  L_y <- tf$reduce_sum(tf$reduce_logsumexp(eta_y, 1L)) + tf$reduce_sum(p_phi)
 
   # Inference
   mu_final <- s_final <- phi_final <- NA
@@ -223,14 +240,14 @@ inference_tflow <- function(Y_dat,
     message("clonealign inference complete")
   }
 
-  rlist <- sess$run(list(mu, gamma, s, phi, tf$exp(log_alpha)), feed_dict = fd)
+  rlist <- sess$run(list(mu, gamma, s, phi, tf$exp(log_alpha), phi_bar, tf$exp(sigma_log)), feed_dict = fd)
 
   # Close the tensorflow session
   sess$close()
 
   rlist$l <- l
 
-  names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "log_lik")
+  names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "phi_bar", "sigma", "log_lik")
 
   rlist$retained_genes <- retained_genes
 
