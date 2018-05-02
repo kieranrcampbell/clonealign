@@ -66,8 +66,8 @@
 #' clones <- cal$clone
 clonealign <- function(gene_expression_data,
                        copy_number_data,
-                       max_iter_em = 50,
-                       max_iter_adam = 200,
+                       max_iter_em = 100,
+                       max_iter_adam = 50,
                        rel_tol_em = 1e-6,
                        rel_tol_adam = 1e-6,
                        gene_filter_threshold = 0,
