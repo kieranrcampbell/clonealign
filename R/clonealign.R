@@ -71,7 +71,7 @@ clonealign <- function(gene_expression_data,
                        rel_tol_em = 1e-6,
                        rel_tol_adam = 1e-6,
                        gene_filter_threshold = 0,
-                       learning_rate = 1e-1,
+                       learning_rate = 0.001,
                        fix_alpha = FALSE,
                        clone_specific_phi = TRUE,
                        verbose = TRUE) {
