@@ -15,7 +15,7 @@
 #' @param rel_tol_adam The relative tolerance for each Adam update in the M-step below which the
 #' maximization will be considered converged
 #' @param max_iter_adam The maximum number of Adam iterations to perform in each M-step
-#' @param gene_filter_threshold Genes with mean counts below or equal to this threshold will
+#' @param gene_filter_threshold Genes with total counts below or equal to this threshold will
 #' be filtered out (removes genes with no counts by default)
 #' @param learning_rate The learning rate to be passed to the Adam optimizer
 #' @param fix_alpha Should the underlying priors for clone frequencies be fixed? Default FALSE
@@ -67,11 +67,11 @@
 clonealign <- function(gene_expression_data,
                        copy_number_data,
                        max_iter_em = 100,
-                       max_iter_adam = 50,
+                       max_iter_adam = 20,
                        rel_tol_em = 1e-6,
                        rel_tol_adam = 1e-6,
                        gene_filter_threshold = 0,
-                       learning_rate = 0.001,
+                       learning_rate = 0.005,
                        fix_alpha = FALSE,
                        clone_specific_phi = TRUE,
                        verbose = TRUE) {

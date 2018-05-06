@@ -4,10 +4,10 @@
 \alias{clonealign}
 \title{Assign scRNA-seq to clone-of-origin}
 \usage{
-clonealign(gene_expression_data, copy_number_data, max_iter_em = 50,
-  max_iter_adam = 200, rel_tol_em = 1e-06, rel_tol_adam = 1e-06,
-  gene_filter_threshold = 0, learning_rate = 0.1, fix_alpha = FALSE,
-  verbose = TRUE)
+clonealign(gene_expression_data, copy_number_data, max_iter_em = 100,
+  max_iter_adam = 20, rel_tol_em = 1e-06, rel_tol_adam = 1e-06,
+  gene_filter_threshold = 0, learning_rate = 0.005, fix_alpha = FALSE,
+  clone_specific_phi = TRUE, verbose = TRUE)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a

@@ -46,7 +46,7 @@ inference_tflow <- function(Y_dat,
     stop(msg)
   }
 
-  zero_gene_means <- colMeans(Y_dat) <= gene_filter_threshold
+  zero_gene_means <- colSums(Y_dat) <= gene_filter_threshold
 
   if(verbose) {
     message(glue("Removing {sum(zero_gene_means)} genes with low counts"))
@@ -115,8 +115,9 @@ inference_tflow <- function(Y_dat,
   log_alpha <- NULL
 
   if(!fix_alpha) {
-    alpha_unconstr_0 <- tf$Variable(tf$zeros(C-1))
-    alpha_unconstr <- tf$concat(list(alpha_unconstr_0, tf$constant(0, dtype = tf$float32, shape = shape(1))), axis = 0L)
+    # alpha_unconstr_0 <- tf$Variable(tf$zeros(C-1))
+    # alpha_unconstr <- tf$concat(list(alpha_unconstr_0, tf$constant(0, dtype = tf$float32, shape = shape(1))), axis = 0L)
+    alpha_unconstr <- tf$Variable(tf$zeros(C))
     log_alpha <- tf$nn$log_softmax(alpha_unconstr)
   } else {
     log_alpha <- tf$constant(rep(-log(C), C))
