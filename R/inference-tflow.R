@@ -36,6 +36,9 @@ inference_tflow <- function(Y_dat,
                             gene_filter_threshold = 0,
                             fix_alpha = FALSE,
                             clone_specific_phi = TRUE,
+                            fix_s = NULL,
+                            sigma_hyper = 1,
+                            saturate = TRUE,
                             verbose = TRUE) {
 
   # Do a first check that we actually have tensorflow support
@@ -69,6 +72,11 @@ inference_tflow <- function(Y_dat,
   # Sanity checks
   stopifnot(nrow(L_dat) == G)
 
+  # Saturate
+  if(saturate) {
+    L_dat <- saturate(L_dat)
+  }
+
   data <- list(
     Y = Y_dat,
     L = L_dat,
@@ -77,7 +85,8 @@ inference_tflow <- function(Y_dat,
     C = C
   )
 
-  mu_guess <- colMeans(data$Y / rowMeans(data$Y))
+
+  mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
   mu_guess <- mu_guess[-1] / mu_guess[1]
 
   LOWER_BOUND <- 1e-10
@@ -91,25 +100,32 @@ inference_tflow <- function(Y_dat,
 
   # Tensorflow variables
   # Data
-  Y <- tf$placeholder(tf$float32, shape = c(N,G))
-  L <- tf$placeholder(tf$float32, shape = c(G,C))
+  Y <- tf$placeholder(shape = c(N,G), dtype = tf$float64)
+  L <- tf$placeholder(shape = c(G,C), dtype = tf$float64)
 
   # Unconstrained variables
-  mu_log <- tf$Variable(tf$constant(log(mu_guess)))
+  mu_log <- tf$Variable(tf$constant(log(mu_guess), dtype = tf$float64))
 
-  s_log <- tf$Variable(tf$constant(log(s_init)))
+  s <- NULL
+  if(!is.null(fix_s)) {
+    s <- tf$constant(s_init, dtype = tf$float64)
+  } else {
+    s_log <- tf$Variable(tf$constant(log(s_init), dtype = tf$float64))
+    s <- tf$exp(s_log) + LOWER_BOUND
+  }
 
   phi_log <- NULL
   if(clone_specific_phi) {
-    phi_log <- tf$Variable(tf$zeros(shape(C,G)))
+    phi_log <- tf$Variable(tf$constant(value = 0, shape = shape(C,G), dtype = tf$float64))
   } else {
-    phi_log <- tf$Variable(tf$zeros(shape(G)))
+    phi_log <- tf$Variable(tf$zeros(shape(G), dtype = tf$float64))
   }
 
   # Variance shrinkage variables
-  phi_bar <- tf$Variable(tf$ones(G))
-  sigma_log <- tf$Variable(tf$ones(1))
-  # sigma_log <- tf$zeros(1L)
+  phi_bar <- tf$Variable(tf$ones(G, dtype = tf$float64))
+  # sigma_log <- tf$Variable(tf$ones(1, dtype = tf$float64))
+  # TODO CHANGE ME
+  sigma_log <- tf$constant(log(sigma_hyper), dtype = tf$float64)
 
 
   log_alpha <- NULL
@@ -117,26 +133,26 @@ inference_tflow <- function(Y_dat,
   if(!fix_alpha) {
     # alpha_unconstr_0 <- tf$Variable(tf$zeros(C-1))
     # alpha_unconstr <- tf$concat(list(alpha_unconstr_0, tf$constant(0, dtype = tf$float32, shape = shape(1))), axis = 0L)
-    alpha_unconstr <- tf$Variable(tf$zeros(C))
+    alpha_unconstr <- tf$Variable(tf$zeros(C, dtype = tf$float64))
     log_alpha <- tf$nn$log_softmax(alpha_unconstr)
   } else {
-    log_alpha <- tf$constant(rep(-log(C), C))
+    log_alpha <- tf$constant(rep(-log(C), C), dtype = tf$float64)
   }
 
 
   # Constrained variables
-  mu <- tf$concat( list(tf$constant(matrix(1.0), dtype = tf$float32),
+  mu <- tf$concat( list(tf$constant(matrix(1.0), dtype = tf$float64),
                         tf$reshape(tf$exp(mu_log) + LOWER_BOUND, c(1L, -1L))),
                    axis = 1L)
   mu <- tf$squeeze(mu)
 
-  s <- tf$exp(s_log) + LOWER_BOUND
   phi <- tf$exp(phi_log) + LOWER_BOUND
 
 
   mu_gc <- tf$einsum('g,gc->gc', mu, L)
 
-  mu_gc_norm_fctr <- 1 / tf$reduce_sum(mu_gc, 0L)
+  mu_gc_norm_fctr <- tf$constant(1, dtype = tf$float64) / tf$reduce_sum(mu_gc, 0L)
+
 
   mu_gc_norm = tf$einsum('gc,c->gc', mu_gc, mu_gc_norm_fctr)
 
@@ -157,14 +173,14 @@ inference_tflow <- function(Y_dat,
 
   p_y_on_c_norm <- tf$reshape(tf$reduce_logsumexp(p_y_on_c, 1L), c(1L, -1L))
 
-  gamma <- tf$exp(tf$transpose(tf$transpose(p_y_on_c) - p_y_on_c_norm))
+  gamma <- tf$exp(tf$transpose(tf$transpose(p_y_on_c) - p_y_on_c_norm)) #+ tf$constant(1e-10)
 
   # Prior on phi
   phi_pdf <- tf$contrib$distributions$Normal(loc = phi_bar, scale = tf$exp(sigma_log))
   p_phi <- phi_pdf$log_prob(tf$log(phi))
 
   # Q function
-  gamma_fixed <- tf$placeholder(dtype = tf$float32, shape = c(N, C))
+  gamma_fixed <- tf$placeholder(dtype = tf$float64, shape = c(N, C))
 
   y_log_prob_g_sum <- tf$reduce_sum(y_log_prob, 2L) + log_alpha
 
@@ -183,6 +199,9 @@ inference_tflow <- function(Y_dat,
   init <- tf$global_variables_initializer()
 
   sess$run(init)
+
+  initial_mu <- sess$run(mu)
+
   fd <- dict(Y = Y_dat, L = L_dat)
   l <- LL <- sess$run(L_y, feed_dict = fd)
 
@@ -241,16 +260,22 @@ inference_tflow <- function(Y_dat,
     message("clonealign inference complete")
   }
 
-  rlist <- sess$run(list(mu, gamma, s, phi, tf$exp(log_alpha), phi_bar, tf$exp(sigma_log)), feed_dict = fd)
+  rlist <- sess$run(list(mu, gamma, s, phi, tf$exp(log_alpha), phi_bar), feed_dict = fd)
+
+
+  probs_eval_init_mu <- sess$run(gamma,
+                                 feed_dict = dict(Y = Y_dat, L = L_dat, mu = initial_mu))
 
   # Close the tensorflow session
   sess$close()
 
   rlist$l <- l
 
-  names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "phi_bar", "sigma", "log_lik")
+  names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "phi_bar", "log_lik")
 
+  rlist$initial_mu <- initial_mu
   rlist$retained_genes <- retained_genes
+  rlist$probs_eval_init_mu <- probs_eval_init_mu
 
   return(rlist)
 }

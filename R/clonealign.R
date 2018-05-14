@@ -18,8 +18,13 @@
 #' @param gene_filter_threshold Genes with total counts below or equal to this threshold will
 #' be filtered out (removes genes with no counts by default)
 #' @param learning_rate The learning rate to be passed to the Adam optimizer
-#' @param fix_alpha Should the underlying priors for clone frequencies be fixed? Default FALSE
+#' @param fix_alpha Should the underlying priors for clone frequencies be fixed? Default TRUE
 #' (values are inferred from the data)
+#' @param clone_specific_phi Should each clone have distinct over-dispersion parameters? Default TRUE
+#' @param fix_s Should the size factors be fixed? If \code{NULL} they are jointly inferred from the data, otherwise
+#' a vector corresponding to the number of cells should be specified.
+#' @param sigma_hyper The hyperparameter governing shrinkage of clone-specific dispersions
+#' @param saturate Should the CNV-expression relationship saturate above copy number = 4? Default TRUE
 #' @param verbose Should warnings and EM convergence information be printed? Default TRUE
 #'
 #'
@@ -34,6 +39,22 @@
 #' row for each gene in \code{gene_expression_data} and a column for each of the clones.
 #' If \code{colnames(copy_number_data)} is not \code{NULL} then these names will be used for each of
 #' the clones in the final output.
+#'
+#' \strong{Recommended parameter settings}
+#'
+#' As with any probabilistic model there are many parameters to set. Through comprehensive simulations regarding
+#' the robustness of the model to mis-specification (ie what's the minimum proportion of genes for which the
+#' CNV-expression relationship can be true and our inferences still valid) we have come up with the following
+#' guidelines for parameter settings, reflected in the default values:
+#'
+#' \itemize{
+#' \item{Number of ADAM iterations - if set to 1 we essentially perform gradient descent on the marginal log-likelihood
+#' which empircally appears to have the best performance}
+#' \item{Dispersions should be clone-specific with weak shrinkage (\code{sigma} = 1 appears best)}
+#' \item{The generating probabilities should be fixed to be a priori equal (this corresponds to setting \code{alpha = TRUE})}
+#' \item{The cell size factors are best fixed in advanced by multiplying the total counts of whatever genes are passed
+#' to clonealign by the edgeR (TMM) normalization factors}
+#' }
 #'
 #'
 #' \strong{Controlling the EM algorithm}
@@ -67,13 +88,16 @@
 clonealign <- function(gene_expression_data,
                        copy_number_data,
                        max_iter_em = 100,
-                       max_iter_adam = 20,
+                       max_iter_adam = 1,
                        rel_tol_em = 1e-6,
                        rel_tol_adam = 1e-6,
                        gene_filter_threshold = 0,
-                       learning_rate = 0.005,
-                       fix_alpha = FALSE,
+                       learning_rate = 0.1,
+                       fix_alpha = TRUE,
                        clone_specific_phi = TRUE,
+                       fix_s = NULL,
+                       sigma_hyper = 1.0,
+                       saturate = TRUE,
                        verbose = TRUE) {
 
   N <- NA # Number of cells
@@ -123,6 +147,9 @@ clonealign <- function(gene_expression_data,
                                gene_filter_threshold = gene_filter_threshold,
                                fix_alpha = fix_alpha,
                                clone_specific_phi = clone_specific_phi,
+                               fix_s = fix_s,
+                               sigma_hyper = sigma_hyper,
+                               saturate = saturate,
                                verbose = verbose)
 
   rlist <- list(
@@ -135,13 +162,16 @@ clonealign <- function(gene_expression_data,
     s = tflow_res$s,
     phi = tflow_res$phi,
     alpha = tflow_res$alpha,
-    phi_bar = tflow_res$phi_bar,
-    sigma = tflow_res$sigma
+    phi_bar = tflow_res$phi_bar
   )
 
   rlist$ml_params <- ml_params
   rlist$log_lik <- tflow_res$log_lik
   rlist$retained_genes <- tflow_res$retained_genes
+
+  rlist$initial_mu <- tflow_res$initial_mu
+
+  rlist$probs_eval_init_mu <- tflow_res$probs_eval_init_mu
 
   # Finally map clone names back to fitted values
   clone_names <- colnames(L)
@@ -201,6 +231,16 @@ print.clonealign_fit <- function(x, ...) {
 #' @examples
 #' data(example_clonealign_fit)
 "example_clonealign_fit"
+
+#' Saturate a copy number matrix above a certain threshold
+#'
+#' @keywords internal
+#'
+#' @return The input clipped (or saturated) below threshold
+saturate <- function(x, threshold = 4) {
+  x[ x > threshold ] <- threshold
+  x
+}
 
 .onLoad <- function(libpath, pkgname) {
   if(!reticulate::py_module_available("tensorflow")) {

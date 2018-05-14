@@ -5,9 +5,10 @@
 \title{Assign scRNA-seq to clone-of-origin}
 \usage{
 clonealign(gene_expression_data, copy_number_data, max_iter_em = 100,
-  max_iter_adam = 20, rel_tol_em = 1e-06, rel_tol_adam = 1e-06,
-  gene_filter_threshold = 0, learning_rate = 0.005, fix_alpha = FALSE,
-  clone_specific_phi = TRUE, verbose = TRUE)
+  max_iter_adam = 1, rel_tol_em = 1e-06, rel_tol_adam = 1e-06,
+  gene_filter_threshold = 0, learning_rate = 0.1, fix_alpha = TRUE,
+  clone_specific_phi = TRUE, fix_s = NULL, sigma_hyper = 1,
+  saturate = TRUE, verbose = TRUE)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -26,13 +27,22 @@ EM algorithm is considered converged}
 \item{rel_tol_adam}{The relative tolerance for each Adam update in the M-step below which the
 maximization will be considered converged}
 
-\item{gene_filter_threshold}{Genes with mean counts below or equal to this threshold will
+\item{gene_filter_threshold}{Genes with total counts below or equal to this threshold will
 be filtered out (removes genes with no counts by default)}
 
 \item{learning_rate}{The learning rate to be passed to the Adam optimizer}
 
-\item{fix_alpha}{Should the underlying priors for clone frequencies be fixed? Default FALSE
+\item{fix_alpha}{Should the underlying priors for clone frequencies be fixed? Default TRUE
 (values are inferred from the data)}
+
+\item{clone_specific_phi}{Should each clone have distinct over-dispersion parameters? Default TRUE}
+
+\item{fix_s}{Should the size factors be fixed? If \code{NULL} they are jointly inferred from the data, otherwise
+a vector corresponding to the number of cells should be specified.}
+
+\item{sigma_hyper}{The hyperparameter governing shrinkage of clone-specific dispersions}
+
+\item{saturate}{Should the CNV-expression relationship saturate above copy number = 4? Default TRUE}
 
 \item{verbose}{Should warnings and EM convergence information be printed? Default TRUE}
 }
@@ -56,6 +66,22 @@ representing raw gene expression counts, or a cell by gene matrix of raw counts.
 row for each gene in \code{gene_expression_data} and a column for each of the clones.
 If \code{colnames(copy_number_data)} is not \code{NULL} then these names will be used for each of
 the clones in the final output.
+
+\strong{Recommended parameter settings}
+
+As with any probabilistic model there are many parameters to set. Through comprehensive simulations regarding
+the robustness of the model to mis-specification (ie what's the minimum proportion of genes for which the
+CNV-expression relationship can be true and our inferences still valid) we have come up with the following
+guidelines for parameter settings, reflected in the default values:
+
+\itemize{
+\item{Number of ADAM iterations - if set to 1 we essentially perform gradient descent on the marginal log-likelihood
+which empircally appears to have the best performance}
+\item{Dispersions should be clone-specific with weak shrinkage (\code{sigma} = 1 appears best)}
+\item{The generating probabilities should be fixed to be a priori equal (this corresponds to setting \code{alpha = TRUE})}
+\item{The cell size factors are best fixed in advanced by multiplying the total counts of whatever genes are passed
+to clonealign by the edgeR (TMM) normalization factors}
+}
 
 
 \strong{Controlling the EM algorithm}
