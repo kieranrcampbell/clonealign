@@ -22,6 +22,7 @@ round2 <- function(x) formatC(signif(x,digits=2), digits=2,format="fg", flag="#"
 #' @importFrom glue glue
 #' @import tensorflow
 #' @importFrom progress progress_bar
+#' @importFrom stats prcomp
 #'
 #' @keywords internal
 #'
@@ -84,6 +85,15 @@ inference_tflow <- function(Y_dat,
     G = G,
     C = C
   )
+
+  #
+  pca <- prcomp(Y_dat, center = TRUE, scale = TRUE)
+  pc1 <- pca$x[,1]
+  pc1 <- (pc1 - mean(pc1)) / sd(pc1)
+
+  W <- tf$Variable(tf$zeros(shape = c(1, G), dtype = tf$float64))
+  psi <- tf$Variable(tf$reshape(tf$constant(pc1, dtype = tf$float64), shape(-1,1)))
+  psi_times_W <- tf$matmul(psi,W)
 
 
   mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
@@ -151,12 +161,16 @@ inference_tflow <- function(Y_dat,
 
   mu_gc <- tf$einsum('g,gc->gc', mu, L)
 
-  mu_gc_norm_fctr <- tf$constant(1, dtype = tf$float64) / tf$reduce_sum(mu_gc, 0L)
+  mu_gcn <- tf$einsum('gc,ng->gcn', mu_gc, exp(psi_times_W))
 
 
-  mu_gc_norm = tf$einsum('gc,c->gc', mu_gc, mu_gc_norm_fctr)
 
-  mu_ncg <- tf$einsum('n,gc->ncg', s, mu_gc_norm)
+  mu_gc_norm_fctr <- tf$constant(1, dtype = tf$float64) / tf$reduce_sum(mu_gcn, 0L)
+
+
+  mu_gc_norm = tf$einsum('gcn,cn->gcn', mu_gcn, mu_gc_norm_fctr)
+
+  mu_ncg <- tf$einsum('n,gcn->ncg', s, mu_gc_norm)
 
   p <- (mu_ncg) / (mu_ncg + phi)
 
@@ -179,12 +193,16 @@ inference_tflow <- function(Y_dat,
   phi_pdf <- tf$contrib$distributions$Normal(loc = phi_bar, scale = tf$exp(sigma_log))
   p_phi <- phi_pdf$log_prob(tf$log(phi))
 
+  # Prior on psi
+  psi_pdf <- tf$contrib$distributions$Normal(loc = tf$zeros(1, dtype = tf$float64), scale = tf$ones(1, dtype = tf$float64))
+  p_psi <- psi_pdf$log_prob(psi)
+
   # Q function
   gamma_fixed <- tf$placeholder(dtype = tf$float64, shape = c(N, C))
 
   y_log_prob_g_sum <- tf$reduce_sum(y_log_prob, 2L) + log_alpha
 
-  Q <- -tf$einsum('nc,nc->', gamma_fixed, y_log_prob_g_sum) - tf$reduce_sum(p_phi)
+  Q <- -tf$einsum('nc,nc->', gamma_fixed, y_log_prob_g_sum) - tf$reduce_sum(p_phi) - tf$reduce_sum(p_psi)
 
   optimizer <- tf$train$AdamOptimizer(learning_rate = learning_rate)
   train <- optimizer$minimize(Q)
@@ -260,7 +278,7 @@ inference_tflow <- function(Y_dat,
     message("clonealign inference complete")
   }
 
-  rlist <- sess$run(list(mu, gamma, s, phi, tf$exp(log_alpha), phi_bar), feed_dict = fd)
+  rlist <- sess$run(list(mu, gamma, s, phi, tf$exp(log_alpha), phi_bar, psi, W), feed_dict = fd)
 
 
   probs_eval_init_mu <- sess$run(gamma,
@@ -271,11 +289,11 @@ inference_tflow <- function(Y_dat,
 
   rlist$l <- l
 
-  names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "phi_bar", "log_lik")
+  names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "phi_bar", "psi", "W", "log_lik")
 
   rlist$initial_mu <- initial_mu
   rlist$retained_genes <- retained_genes
-  rlist$probs_eval_init_mu <- probs_eval_init_mu
+  # rlist$probs_eval_init_mu <- probs_eval_init_mu
 
   return(rlist)
 }

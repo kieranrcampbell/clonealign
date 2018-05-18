@@ -162,16 +162,14 @@ clonealign <- function(gene_expression_data,
     s = tflow_res$s,
     phi = tflow_res$phi,
     alpha = tflow_res$alpha,
-    phi_bar = tflow_res$phi_bar
+    phi_bar = tflow_res$phi_bar,
+    psi = tflow_res$psi,
+    W = tflow_res$W
   )
 
   rlist$ml_params <- ml_params
   rlist$log_lik <- tflow_res$log_lik
   rlist$retained_genes <- tflow_res$retained_genes
-
-  rlist$initial_mu <- tflow_res$initial_mu
-
-  rlist$probs_eval_init_mu <- tflow_res$probs_eval_init_mu
 
   # Finally map clone names back to fitted values
   clone_names <- colnames(L)
