@@ -8,7 +8,7 @@ clonealign(gene_expression_data, copy_number_data, max_iter_em = 100,
   max_iter_adam = 1, rel_tol_em = 1e-06, rel_tol_adam = 1e-06,
   gene_filter_threshold = 0, learning_rate = 0.1, fix_alpha = TRUE,
   clone_specific_phi = TRUE, fix_s = NULL, sigma_hyper = 1,
-  saturate = TRUE, verbose = TRUE)
+  dtype = "float64", saturate = TRUE, verbose = TRUE)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -41,6 +41,8 @@ be filtered out (removes genes with no counts by default)}
 a vector corresponding to the number of cells should be specified.}
 
 \item{sigma_hyper}{The hyperparameter governing shrinkage of clone-specific dispersions}
+
+\item{dtype}{The dtype for tensorflow useage, either "float32" or "float64"}
 
 \item{saturate}{Should the CNV-expression relationship saturate above copy number = 4? Default TRUE}
 

@@ -24,6 +24,7 @@
 #' @param fix_s Should the size factors be fixed? If \code{NULL} they are jointly inferred from the data, otherwise
 #' a vector corresponding to the number of cells should be specified.
 #' @param sigma_hyper The hyperparameter governing shrinkage of clone-specific dispersions
+#' @param dtype The dtype for tensorflow useage, either "float32" or "float64"
 #' @param saturate Should the CNV-expression relationship saturate above copy number = 4? Default TRUE
 #' @param verbose Should warnings and EM convergence information be printed? Default TRUE
 #'
@@ -97,6 +98,7 @@ clonealign <- function(gene_expression_data,
                        clone_specific_phi = TRUE,
                        fix_s = NULL,
                        sigma_hyper = 1.0,
+                       dtype = "float64",
                        saturate = TRUE,
                        verbose = TRUE) {
 
@@ -149,6 +151,7 @@ clonealign <- function(gene_expression_data,
                                clone_specific_phi = clone_specific_phi,
                                fix_s = fix_s,
                                sigma_hyper = sigma_hyper,
+                               dtype = dtype,
                                saturate = saturate,
                                verbose = verbose)
 

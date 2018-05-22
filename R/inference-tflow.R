@@ -39,6 +39,7 @@ inference_tflow <- function(Y_dat,
                             clone_specific_phi = TRUE,
                             fix_s = NULL,
                             sigma_hyper = 1,
+                            dtype = c("float32", "float64"),
                             saturate = TRUE,
                             verbose = TRUE) {
 
@@ -49,6 +50,12 @@ inference_tflow <- function(Y_dat,
     msg <- c(msg, "For more details see the clonealign vignette or https://tensorflow.rstudio.com/tensorflow/articles/installation.html")
     stop(msg)
   }
+
+  # Sort out the dtype
+  dtype <- match.arg(dtype)
+  dtype <- switch(dtype,
+                  float32 = tf$float32,
+                  float64 = tf$float64)
 
   zero_gene_means <- colSums(Y_dat) <= gene_filter_threshold
 
@@ -91,8 +98,8 @@ inference_tflow <- function(Y_dat,
   pc1 <- pca$x[,1]
   pc1 <- (pc1 - mean(pc1)) / sd(pc1)
 
-  W <- tf$Variable(tf$zeros(shape = c(1, G), dtype = tf$float64))
-  psi <- tf$Variable(tf$reshape(tf$constant(pc1, dtype = tf$float64), shape(-1,1)))
+  W <- tf$Variable(tf$zeros(shape = c(1, G), dtype = dtype))
+  psi <- tf$Variable(tf$reshape(tf$constant(pc1, dtype = dtype), shape(-1,1)))
   psi_times_W <- tf$matmul(psi,W)
 
 
@@ -110,32 +117,32 @@ inference_tflow <- function(Y_dat,
 
   # Tensorflow variables
   # Data
-  Y <- tf$placeholder(shape = c(N,G), dtype = tf$float64)
-  L <- tf$placeholder(shape = c(G,C), dtype = tf$float64)
+  Y <- tf$placeholder(shape = c(N,G), dtype = dtype)
+  L <- tf$placeholder(shape = c(G,C), dtype = dtype)
 
   # Unconstrained variables
-  mu_log <- tf$Variable(tf$constant(log(mu_guess), dtype = tf$float64))
+  mu_log <- tf$Variable(tf$constant(log(mu_guess), dtype = dtype))
 
   s <- NULL
   if(!is.null(fix_s)) {
-    s <- tf$constant(s_init, dtype = tf$float64)
+    s <- tf$constant(s_init, dtype = dtype)
   } else {
-    s_log <- tf$Variable(tf$constant(log(s_init), dtype = tf$float64))
+    s_log <- tf$Variable(tf$constant(log(s_init), dtype = dtype))
     s <- tf$exp(s_log) + LOWER_BOUND
   }
 
   phi_log <- NULL
   if(clone_specific_phi) {
-    phi_log <- tf$Variable(tf$constant(value = 0, shape = shape(C,G), dtype = tf$float64))
+    phi_log <- tf$Variable(tf$constant(value = 0, shape = shape(C,G), dtype = dtype))
   } else {
-    phi_log <- tf$Variable(tf$zeros(shape(G), dtype = tf$float64))
+    phi_log <- tf$Variable(tf$zeros(shape(G), dtype = dtype))
   }
 
   # Variance shrinkage variables
-  phi_bar <- tf$Variable(tf$ones(G, dtype = tf$float64))
-  # sigma_log <- tf$Variable(tf$ones(1, dtype = tf$float64))
+  phi_bar <- tf$Variable(tf$ones(G, dtype = dtype))
+  # sigma_log <- tf$Variable(tf$ones(1, dtype = dtype))
   # TODO CHANGE ME
-  sigma_log <- tf$constant(log(sigma_hyper), dtype = tf$float64)
+  sigma_log <- tf$constant(log(sigma_hyper), dtype = dtype)
 
 
   log_alpha <- NULL
@@ -143,15 +150,15 @@ inference_tflow <- function(Y_dat,
   if(!fix_alpha) {
     # alpha_unconstr_0 <- tf$Variable(tf$zeros(C-1))
     # alpha_unconstr <- tf$concat(list(alpha_unconstr_0, tf$constant(0, dtype = tf$float32, shape = shape(1))), axis = 0L)
-    alpha_unconstr <- tf$Variable(tf$zeros(C, dtype = tf$float64))
+    alpha_unconstr <- tf$Variable(tf$zeros(C, dtype = dtype))
     log_alpha <- tf$nn$log_softmax(alpha_unconstr)
   } else {
-    log_alpha <- tf$constant(rep(-log(C), C), dtype = tf$float64)
+    log_alpha <- tf$constant(rep(-log(C), C), dtype = dtype)
   }
 
 
   # Constrained variables
-  mu <- tf$concat( list(tf$constant(matrix(1.0), dtype = tf$float64),
+  mu <- tf$concat( list(tf$constant(matrix(1.0), dtype = dtype),
                         tf$reshape(tf$exp(mu_log) + LOWER_BOUND, c(1L, -1L))),
                    axis = 1L)
   mu <- tf$squeeze(mu)
@@ -165,7 +172,7 @@ inference_tflow <- function(Y_dat,
 
 
 
-  mu_gc_norm_fctr <- tf$constant(1, dtype = tf$float64) / tf$reduce_sum(mu_gcn, 0L)
+  mu_gc_norm_fctr <- tf$constant(1, dtype = dtype) / tf$reduce_sum(mu_gcn, 0L)
 
 
   mu_gc_norm = tf$einsum('gcn,cn->gcn', mu_gcn, mu_gc_norm_fctr)
@@ -194,11 +201,11 @@ inference_tflow <- function(Y_dat,
   p_phi <- phi_pdf$log_prob(tf$log(phi))
 
   # Prior on psi
-  psi_pdf <- tf$contrib$distributions$Normal(loc = tf$zeros(1, dtype = tf$float64), scale = tf$ones(1, dtype = tf$float64))
+  psi_pdf <- tf$contrib$distributions$Normal(loc = tf$zeros(1, dtype = dtype), scale = tf$ones(1, dtype = dtype))
   p_psi <- psi_pdf$log_prob(psi)
 
   # Q function
-  gamma_fixed <- tf$placeholder(dtype = tf$float64, shape = c(N, C))
+  gamma_fixed <- tf$placeholder(dtype = dtype, shape = c(N, C))
 
   y_log_prob_g_sum <- tf$reduce_sum(y_log_prob, 2L) + log_alpha
 
