@@ -5,8 +5,10 @@
 `clonealign` assigns single-cell RNA-seq expression to cancer clones by mapping RNA-seq to clone-specific copy number profiles. This is particularly useful when clones have been inferred using ultra-shallow single-cell DNA-seq meaning SNV analysis is not possible.
 
 <div style="text-align:center">
-  <img src="inst/clonealign_idea.png" width="500" align="middle"/>
+  <img src="https://raw.githubusercontent.com/kieranrcampbell/clonealign/master/inst/clonealign_idea.png" width="500" align="middle"/>
 </div>
+
+See the [website](https://kieranrcampbell.github.io/clonealign) for more details as well as the [introductory vignette](https://kieranrcampbell.github.io/clonealign/articles/introduction_to_clonealign.html).
 
 ## Getting started
 
