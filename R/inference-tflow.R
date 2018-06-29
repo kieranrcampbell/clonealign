@@ -93,63 +93,54 @@ inference_tflow <- function(Y_dat,
     C = C
   )
 
-  #
-  pca <- prcomp(Y_dat, center = TRUE, scale = TRUE)
-  pc1 <- pca$x[,1]
-  pc1 <- (pc1 - mean(pc1)) / sd(pc1)
-
-  W <- tf$Variable(tf$zeros(shape = c(1, G), dtype = dtype))
-  psi <- tf$Variable(tf$reshape(tf$constant(pc1, dtype = dtype), shape(-1,1)))
-  psi_times_W <- tf$matmul(psi,W)
-
-
-  mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
-  mu_guess <- mu_guess[-1] / mu_guess[1]
-
-  LOWER_BOUND <- 1e-10
-
-  s_init = rowSums(data$Y)
-
   if(verbose) {
     message("Creating Tensorflow graph...")
   }
 
 
-  # Tensorflow variables
   # Data
   Y <- tf$placeholder(shape = c(N,G), dtype = dtype)
   L <- tf$placeholder(shape = c(G,C), dtype = dtype)
+  LOWER_BOUND <- 1e-10
 
-  # Unconstrained variables
+  # Initializations
+  pca <- prcomp(Y_dat, center = TRUE, scale = TRUE)
+  pc1 <- pca$x[,1]
+  pc1 <- (pc1 - mean(pc1)) / sd(pc1)
+  s_init = rowSums(data$Y)
+
+  mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
+  mu_guess <- mu_guess[-1] / mu_guess[1]
+
+
+  # Variables ------
+  W <- tf$Variable(tf$zeros(shape = c(G, 1), dtype = dtype))
+  psi <- tf$Variable(tf$reshape(tf$constant(pc1, dtype = dtype), shape(-1,1)))
+  psi_times_W <- tf$matmul(psi, W, transpose_b = TRUE)
+
   mu_log <- tf$Variable(tf$constant(log(mu_guess), dtype = dtype))
 
   s <- NULL
   if(!is.null(fix_s)) {
     s <- tf$constant(s_init, dtype = dtype)
   } else {
-    s_log <- tf$Variable(tf$constant(log(s_init), dtype = dtype))
-    s <- tf$exp(s_log) + LOWER_BOUND
+    s <- tf$exp(tf$Variable(tf$constant(log(s_init), dtype = dtype))) + LOWER_BOUND
   }
 
-  phi_log <- NULL
+  phi <- NULL
   if(clone_specific_phi) {
-    phi_log <- tf$Variable(tf$constant(value = 0, shape = shape(C,G), dtype = dtype))
+    phi <- tf$exp(tf$Variable(tf$constant(value = 0, shape = shape(C,G), dtype = dtype))) + LOWER_BOUND
   } else {
-    phi_log <- tf$Variable(tf$zeros(shape(G), dtype = dtype))
+    phi <- tf$exp(tf$Variable(tf$zeros(shape(G), dtype = dtype))) + LOWER_BOUND
   }
 
-  # Variance shrinkage variables
   phi_bar <- tf$Variable(tf$ones(G, dtype = dtype))
-  # sigma_log <- tf$Variable(tf$ones(1, dtype = dtype))
-  # TODO CHANGE ME
   sigma_log <- tf$constant(log(sigma_hyper), dtype = dtype)
 
 
   log_alpha <- NULL
 
   if(!fix_alpha) {
-    # alpha_unconstr_0 <- tf$Variable(tf$zeros(C-1))
-    # alpha_unconstr <- tf$concat(list(alpha_unconstr_0, tf$constant(0, dtype = tf$float32, shape = shape(1))), axis = 0L)
     alpha_unconstr <- tf$Variable(tf$zeros(C, dtype = dtype))
     log_alpha <- tf$nn$log_softmax(alpha_unconstr)
   } else {
@@ -157,44 +148,28 @@ inference_tflow <- function(Y_dat,
   }
 
 
-  # Constrained variables
+  # Build likelihood
   mu <- tf$concat( list(tf$constant(matrix(1.0), dtype = dtype),
                         tf$reshape(tf$exp(mu_log) + LOWER_BOUND, c(1L, -1L))),
                    axis = 1L)
   mu <- tf$squeeze(mu)
 
-  phi <- tf$exp(phi_log) + LOWER_BOUND
-
-
-  mu_gc <- tf$einsum('g,gc->gc', mu, L)
-
-  mu_gcn <- tf$einsum('gc,ng->gcn', mu_gc, exp(psi_times_W))
-
-
-
-  mu_gc_norm_fctr <- tf$constant(1, dtype = dtype) / tf$reduce_sum(mu_gcn, 0L)
-
-
-  mu_gc_norm = tf$einsum('gcn,cn->gcn', mu_gcn, mu_gc_norm_fctr)
-
-  mu_ncg <- tf$einsum('n,gcn->ncg', s, mu_gc_norm)
+  mu_cg <- tf$transpose(L) * mu
+  mu_gcn <- tf$einsum('cg,ng->gcn', mu_cg, tf$exp(psi_times_W))
+  mu_gc_norm_fctr <- s / tf$reduce_sum(mu_gcn, 0L) # C by N
+  mu_gcn_norm <- mu_gcn * mu_gc_norm_fctr
+  mu_ncg <- tf$transpose(mu_gcn_norm, perm = c(2L, 1L, 0L))
 
   p <- (mu_ncg) / (mu_ncg + phi)
-
   y_pdf <- tf$contrib$distributions$NegativeBinomial(probs = p, total_count = phi)
-
-
   Y_tiled <- tf$stack(rep(list(Y), data$C), axis = 1)
-
   y_log_prob <- y_pdf$log_prob(Y_tiled)
 
   p_y_on_c <- tf$reduce_sum(y_log_prob, 2L)
   p_y_on_c <- p_y_on_c + log_alpha
-
-
   p_y_on_c_norm <- tf$reshape(tf$reduce_logsumexp(p_y_on_c, 1L), c(1L, -1L))
 
-  gamma <- tf$exp(tf$transpose(tf$transpose(p_y_on_c) - p_y_on_c_norm)) #+ tf$constant(1e-10)
+  gamma <- tf$exp(tf$transpose(tf$transpose(p_y_on_c) - p_y_on_c_norm))
 
   # Prior on phi
   phi_pdf <- tf$contrib$distributions$Normal(loc = phi_bar, scale = tf$exp(sigma_log))
@@ -214,7 +189,7 @@ inference_tflow <- function(Y_dat,
   optimizer <- tf$train$AdamOptimizer(learning_rate = learning_rate)
   train <- optimizer$minimize(Q)
 
-  eta_y <- y_log_prob_g_sum#tf$reduce_sum(y_log_prob, 2L)
+  eta_y <- y_log_prob_g_sum
   L_y <- tf$reduce_sum(tf$reduce_logsumexp(eta_y, 1L)) + tf$reduce_sum(p_phi)
 
   # Inference
@@ -232,7 +207,7 @@ inference_tflow <- function(Y_dat,
 
   LL_diff <- Inf
 
-  pb <- progress_bar$new(total = max_iter_em,
+  pb <- progress_bar$new(total = max_iter_em+1,
                          format = "  running EM [:bar] :percent | change in log-lik :change")
   pb$tick(0,tokens = list(change = glue("{LL_diff}%")))
 
@@ -279,7 +254,7 @@ inference_tflow <- function(Y_dat,
 
   }
 
-  pb$tick(100, tokens = list(change = glue("{round2(LL_diff)}%")))
+  # pb$tick(100, tokens = list(change = glue("{round2(LL_diff)}%")))
 
   if(verbose) {
     message("clonealign inference complete")
