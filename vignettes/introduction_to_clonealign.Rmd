@@ -195,6 +195,26 @@ where the `*_str` identifies the columns of `rowData(example_sce)` to look for t
 
 ## Evaluating the clone assignment
 
+`clonealign` will assign single-cell RNA-seq to clones no matter how good the fit and no matter whether the clones actually exist in the expression data. As a consequence, it is important to evaluate the quality of fit which in practice we do by fitting the clones on a subset of genes and looking at how well the predicted expression profiles fits the observed expression data of the "held-out" genes. 
+
+We perform his out-of-sample evaluation using the `evaluate_clonealign` function, which takes in the clonealign fit on the full dataset (along with the dataset) and both prints various metrics and returns a list containing various computed objects:
+
+```{r}
+ec <- evaluate_clonealign(example_sce, cnv_data, cal)
+```
+
+The function call prints several important metrics:
+
+1. The mean square error (MSE) on the full dataset given the clone assignments, compared to the average MSE
+under a null distribution found by permuting the clone assignments. If the observed MSE is greater than the null
+MSE (either on average or a large percent of the time) then the fit is very poor and should be discarded
+2. The agreement between the clone assignments on the full geneset and under the null geneset. If these are
+very different then the algorithm is sensitive to the input genes and caution is advised
+3. The MSE of held-out (out-of-sample) genes using a clonealign fit on an orthogonal test set of genes. Again, if
+the observed MSE is greater than the null MSE (or approximately the same) then the fit is unreliable and should
+be discarded.
+
+These metrics are stored in a list returned by the function call. For details, see the help page at `?evaluate_clonealign`.
 
 # Advanced options
 
