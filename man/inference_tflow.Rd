@@ -6,9 +6,10 @@
 \usage{
 inference_tflow(Y_dat, L_dat, max_iter_em = 50, max_iter_adam = 200,
   rel_tol_em = 1e-05, rel_tol_adam = 1e-06, learning_rate = 0.001,
-  gene_filter_threshold = 0, fix_alpha = FALSE, clone_specific_phi = TRUE,
-  fix_s = NULL, sigma_hyper = 1, dtype = c("float32", "float64"),
-  saturate = TRUE, verbose = TRUE)
+  gene_filter_threshold = 0, x = NULL, fix_alpha = FALSE,
+  clone_specific_phi = TRUE, fix_s = NULL, sigma_hyper = 1,
+  dtype = c("float32", "float64"), saturate = TRUE,
+  saturation_threshold = 4, K = 1, verbose = TRUE)
 }
 \arguments{
 \item{Y_dat}{Cell by gene matrix of counts}

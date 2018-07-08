@@ -35,12 +35,15 @@ inference_tflow <- function(Y_dat,
                             rel_tol_adam = 1e-6,
                             learning_rate = 1e-3,
                             gene_filter_threshold = 0,
+                            x = NULL,
                             fix_alpha = FALSE,
                             clone_specific_phi = TRUE,
                             fix_s = NULL,
                             sigma_hyper = 1,
                             dtype = c("float32", "float64"),
                             saturate = TRUE,
+                            saturation_threshold = 4,
+                            K = 1,
                             verbose = TRUE) {
 
   # Do a first check that we actually have tensorflow support
@@ -50,6 +53,9 @@ inference_tflow <- function(Y_dat,
     msg <- c(msg, "For more details see the clonealign vignette or https://tensorflow.rstudio.com/tensorflow/articles/installation.html")
     stop(msg)
   }
+
+  # Reset graph
+  tf$reset_default_graph()
 
   # Sort out the dtype
   dtype <- match.arg(dtype)
@@ -82,14 +88,25 @@ inference_tflow <- function(Y_dat,
 
   # Saturate
   if(saturate) {
-    L_dat <- saturate(L_dat)
+    L_dat <- saturate(L_dat, saturation_threshold)
   }
+
+  # Get covariate information
+  P <- 0
+  if(!is.null(x)) {
+    if(is.vector(x)) x <- matrix(x, ncol = 1)
+    stopifnot(is.matrix(x))
+    P <- ncol(x)
+    stopifnot(nrow(x) == N)
+  }
+
 
   data <- list(
     Y = Y_dat,
     L = L_dat,
     N = N,
     G = G,
+    x = x,
     C = C
   )
 
@@ -99,14 +116,18 @@ inference_tflow <- function(Y_dat,
 
 
   # Data
-  Y <- tf$placeholder(shape = c(N,G), dtype = dtype)
-  L <- tf$placeholder(shape = c(G,C), dtype = dtype)
+  Y <- tf$placeholder(shape = shape(N,G), dtype = dtype)
+  L <- tf$placeholder(shape = shape(G,C), dtype = dtype)
+  if(P > 0) {
+    X <- tf$placeholder(shape = shape(N, P), dtype = dtype)
+  }
   LOWER_BOUND <- 1e-10
 
   # Initializations
   pca <- prcomp(Y_dat, center = TRUE, scale = TRUE)
-  pc1 <- pca$x[,1]
-  pc1 <- (pc1 - mean(pc1)) / sd(pc1)
+  pcs <- pca$x[,seq_len(K),drop=FALSE]
+  pcs <- scale(pcs)
+
   s_init = rowSums(data$Y)
 
   mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
@@ -114,9 +135,13 @@ inference_tflow <- function(Y_dat,
 
 
   # Variables ------
-  W <- tf$Variable(tf$zeros(shape = c(G, 1), dtype = dtype))
-  psi <- tf$Variable(tf$reshape(tf$constant(pc1, dtype = dtype), shape(-1,1)))
+  W <- tf$Variable(tf$zeros(shape = c(G, K), dtype = dtype))
+  psi <- tf$Variable(tf$constant(pcs, dtype = dtype))
   psi_times_W <- tf$matmul(psi, W, transpose_b = TRUE)
+  if(P > 0) {
+    beta <- tf$get_variable("beta", initializer = tf$zeros(shape = shape(G,P), dtype = dtype))
+    X_times_beta = tf$matmul(X, beta, transpose_b = TRUE)
+  }
 
   mu_log <- tf$Variable(tf$constant(log(mu_guess), dtype = dtype))
 
@@ -154,8 +179,15 @@ inference_tflow <- function(Y_dat,
                    axis = 1L)
   mu <- tf$squeeze(mu)
 
+  random_fixed_effects <- NULL
+  if(P == 0) {
+    random_fixed_effects <- tf$exp(psi_times_W)
+  } else {
+    random_fixed_effects <- tf$exp(psi_times_W + X_times_beta)
+  }
+
   mu_cg <- tf$transpose(L) * mu
-  mu_gcn <- tf$einsum('cg,ng->gcn', mu_cg, tf$exp(psi_times_W))
+  mu_gcn <- tf$einsum('cg,ng->gcn', mu_cg, random_fixed_effects)
   mu_gc_norm_fctr <- s / tf$reduce_sum(mu_gcn, 0L) # C by N
   mu_gcn_norm <- mu_gcn * mu_gc_norm_fctr
   mu_ncg <- tf$transpose(mu_gcn_norm, perm = c(2L, 1L, 0L))
@@ -202,7 +234,13 @@ inference_tflow <- function(Y_dat,
 
   initial_mu <- sess$run(mu)
 
-  fd <- dict(Y = Y_dat, L = L_dat)
+  fd <- NULL
+  if(P == 0) {
+    fd <- dict(Y = Y_dat, L = L_dat)
+  } else {
+    fd <- dict(Y = Y_dat, L = L_dat, X = x)
+  }
+
   l <- LL <- sess$run(L_y, feed_dict = fd)
 
   LL_diff <- Inf
@@ -214,68 +252,53 @@ inference_tflow <- function(Y_dat,
 
 
   for( i in seq_len(max_iter_em) ) {
+    pb$tick(tokens = list(change = glue("{round2(LL_diff)}%")))
 
     # E-step
     g <- sess$run(gamma, feed_dict = fd)
 
     # M-step
-    gfd <- dict(Y = Y_dat, L = L_dat, gamma_fixed =  g)
-    Q_old <- sess$run(Q, feed_dict = gfd)
-    Q_diff <- Inf
-    pb$tick(tokens = list(change = glue("{round2(LL_diff)}%")))
-
-    mi <- 0
-
-    while(mi < max_iter_adam && Q_diff > rel_tol_adam) {
-      mi <- mi + 1
-      sess$run(train, feed_dict = gfd)
-      Q_new = sess$run(Q, feed_dict = dict(Y = data$Y, L = data$L, gamma_fixed = g))
-      Q_diff = -(Q_new - Q_old) / abs(Q_old)
-
-      # print(Q_new)
-      # print(Q_diff)
-
-      Q_old <- Q_new
+    if(P == 0) {
+      gfd <- dict(Y = Y_dat, L = L_dat, gamma_fixed =  g)
+    } else {
+      gfd <- dict(Y = Y_dat, L = L_dat, X = x, gamma_fixed = g)
     }
 
-    if(mi == max_iter_adam) {
-      warning("Maximim number of ADAM iterations reached reached")
+    for(mi in seq_len(max_iter_adam)) {
+      sess$run(train, feed_dict = gfd)
     }
 
     L_new <- sess$run(L_y, feed_dict = fd)
     LL_diff <- (L_new - LL)/abs(LL)
-    # print(glue("EM iteration {i}\t New log-likelihood: {L_new}; Difference (%): {LL_diff}"))
     l <- c(l, L_new)
     LL <- L_new
-
 
     if(abs(LL_diff) < rel_tol_em)
       break
 
   }
 
-  # pb$tick(100, tokens = list(change = glue("{round2(LL_diff)}%")))
-
   if(verbose) {
     message("clonealign inference complete")
   }
 
   rlist <- sess$run(list(mu, gamma, s, phi, tf$exp(log_alpha), phi_bar, psi, W), feed_dict = fd)
-
-
-  probs_eval_init_mu <- sess$run(gamma,
-                                 feed_dict = dict(Y = Y_dat, L = L_dat, mu = initial_mu))
+  if(P > 0) {
+    rlist$beta <- sess$run(beta, feed_dict = fd)
+  }
 
   # Close the tensorflow session
   sess$close()
 
   rlist$l <- l
-
-  names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "phi_bar", "psi", "W", "log_lik")
+  if(P > 0) {
+    names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "phi_bar", "psi", "W", "beta", "log_lik")
+  } else {
+    names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "phi_bar", "psi", "W", "log_lik")
+  }
 
   rlist$initial_mu <- initial_mu
   rlist$retained_genes <- retained_genes
-  # rlist$probs_eval_init_mu <- probs_eval_init_mu
 
   return(rlist)
 }

@@ -25,8 +25,12 @@
 #' a vector corresponding to the number of cells should be specified.
 #' @param sigma_hyper The hyperparameter governing shrinkage of clone-specific dispersions
 #' @param dtype The dtype for tensorflow useage, either "float32" or "float64"
-#' @param saturate Should the CNV-expression relationship saturate above copy number = 4? Default TRUE
+#' @param saturate Should the CNV-expression relationship saturate above copy number = \code{saturation_threshold}? Default TRUE
+#' @param saturation_threshold If \code{saturate} is true, copy numbers above this will be reduced to the threshold
 #' @param verbose Should warnings and EM convergence information be printed? Default TRUE
+#' @param x An optional vector of covariates, e.g. corresponding to batch or patient. Can be a vector of a single
+#' covariate or a sample by covariate matrix. Note this should not contain an intercept.
+#' @param K The dimensionality of the expression latent space.
 #'
 #'
 #' @details
@@ -94,17 +98,21 @@ clonealign <- function(gene_expression_data,
                        rel_tol_adam = 1e-6,
                        gene_filter_threshold = 0,
                        learning_rate = 0.1,
+                       x = NULL,
                        fix_alpha = TRUE,
                        clone_specific_phi = TRUE,
                        fix_s = NULL,
                        sigma_hyper = 1.0,
                        dtype = "float64",
                        saturate = TRUE,
+                       saturation_threshold = 4,
+                       K = 1,
                        verbose = TRUE) {
 
   N <- NA # Number of cells
   G <- NA # Number of genes
   C <- NA # Number of clones
+
 
   # Parse gene expression data first
   if(is(gene_expression_data, "SingleCellExperiment") || is(gene_expression_data, "SummarizedExperiment")) {
@@ -147,12 +155,15 @@ clonealign <- function(gene_expression_data,
                                rel_tol_adam = rel_tol_adam,
                                learning_rate = learning_rate,
                                gene_filter_threshold = gene_filter_threshold,
+                               x = x,
                                fix_alpha = fix_alpha,
                                clone_specific_phi = clone_specific_phi,
                                fix_s = fix_s,
                                sigma_hyper = sigma_hyper,
                                dtype = dtype,
                                saturate = saturate,
+                               saturation_threshold = saturation_threshold,
+                               K = K,
                                verbose = verbose)
 
   rlist <- list(
@@ -169,6 +180,8 @@ clonealign <- function(gene_expression_data,
     psi = tflow_res$psi,
     W = tflow_res$W
   )
+
+  if('beta' %in% names(rlist)) ml_params$beta <- rlist$beta
 
   rlist$ml_params <- ml_params
   rlist$log_lik <- tflow_res$log_lik
@@ -251,5 +264,195 @@ saturate <- function(x, threshold = 4) {
     stop(msg)
   }
 }
+
+
+#' Evaluate the quality of a clonealign fit
+#'
+#' Use mean squared error of predicting the expression of held-out genes to evaluate the quality of a clonealign fit.
+#'
+#' @param gene_expression_data Either a \code{SingleCellExperiment} or matrix of counts, same as input to \code{clonealign}
+#' @param copy_number_data A gene-by-clone matrix of copy numbers, the same as the input to \code{clonealign}
+#' @param clonealign_fit The fit returned by a call to \code{clonealign()} on the full geneset
+#' @param prop_holdout The proportion of genes to hold out as a \emph{test} set for predicting gene expression
+#' @param n_samples The number of random permutations to establish a null distribution of predictive performance
+#' @param s Vector of cell size factors - defaults to the total counts per cell
+#' @param ... Additional arguments to pass to the \code{clonealign} call
+#'
+#' @return A list object describing the evaluation results. See \code{details}
+#'
+#' @details
+#'
+#' This evaluation function is built around the idea of how good predicted expression is under the model given
+#' the inferred (assigned) clones compared to how well you could predict expression given a random clonal assignment.
+#'
+#' \strong{Evaluations performed}
+#'
+#' \enumerate{
+#' \item On the \emph{full} dataset, the mean square error is compared to the randomized error, and a message
+#' printed about the ratio of the two errors and the proportion of time the observed error was less than the
+#' error under a null distribution. If either the error under the null is smaller than the observed, or is
+#' smaller some percentage of time, then the fit has real problems and should be abandoned as it suggests the
+#' model is stuck in a local maxima (which could happen if the proposed clones aren't actually present in the
+#' RNA-seq).
+#' \item A certain proportion of genes (as decided by the \code{prop_holdout} parameter) are held out as a \emph{test}
+#' set, and the clonealign fit is re-performed on the \code{1 - prop_holdout} proportion of genes. The function will then
+#' print an agreement table of clone assignments between the full table and the reduced table. If these vastly disagree
+#' for only a small change in gene set (ie \code{prop_holdout} is around 0.1 or 0.2), then the fit may be unreliable
+#' as it is sensitive to the genes inputted.
+#' \item The same metrics from (1) are then printed where the evaluations are performed on the heldout set. Again,
+#' if the observed mean squared error given the clonealign fit isn't less than the null mean squared error
+#' a large proportion of the time, the fit may be unreliable.
+#'
+#' }
+#'
+#' \strong{Object returned}
+#'
+#' Everything computed above is returned in a list object with the following entries:
+#'
+#' \itemize{
+#' \item full_clonealign_fit - the original clonealign fit on the full gene set that was passed in as the
+#' \code{clonealign_fit} argument
+#' \item full_observed_mse - the observed mean square error using the full gene set
+#' \item full_null_mse - A vector of mean square error under the randomized (permuted) distribution
+#' \item reduced_clonealign_fit - a clonealign fit on only the reduced (train) set of genes
+#' \item heldout_inds - the indices of the genes held out (test set) for evaluating predictive performance
+#' out-of-sample
+#' \item kept_inds - the indices of retained genes as part of the reduced (train) set
+#' \item heldout_observed_mse - the observed mean square error on the heldout (test) set of genes
+#' \item heldout_null_mse - a vector of mean square errors under a null distribution of randomly permuting the clones
+#'
+#' }
+#'
+#'
+#'
+#' @importFrom glue glue
+#' @export
+#'
+#' @examples
+#' library(SingleCellExperiment)
+#' data(example_clonealign_fit)
+#' data(example_sce)
+#' copy_number_data <- rowData(example_sce)[,c("A", "B", "C")]
+#' evaluate_clonealign(example_sce, copy_number_data, example_clonealign_fit)
+#'
+evaluate_clonealign <- function(gene_expression_data,
+                    copy_number_data,
+                    clonealign_fit,
+                    prop_holdout = 0.2,
+                    n_samples = 100,
+                    s = NULL,
+                    ...) {
+
+  N <- NA # Number of cells
+  G <- NA # Number of genes
+  C <- NA # Number of clones
+
+
+  # Parse gene expression data first
+  if(is(gene_expression_data, "SingleCellExperiment") || is(gene_expression_data, "SummarizedExperiment")) {
+    assay_names <- names(assays(gene_expression_data))
+    if(!("counts" %in% assay_names)) {
+      stop(paste("counts not in assays(gene_expression_data). Available assays:", paste(assay_names, collapse = ",")))
+    }
+    Y <- t(as.matrix(assay(gene_expression_data, "counts")))
+  } else if(is(gene_expression_data, "matrix")) {
+    Y <- gene_expression_data
+  } else {
+    stop("Input gene_expression_data must be SingleCellExperiment, SummarizedExperiment, or matrix")
+  }
+  N <- nrow(Y)
+  G <- ncol(Y)
+
+  # Parse cnv data
+  if(is(copy_number_data, "data.frame") || is(copy_number_data, "DataFrame")) {
+    L <- as.matrix(copy_number_data)
+  } else if(is(copy_number_data, "matrix")) {
+    L <- copy_number_data
+  } else {
+    stop(paste("copy_number_data must be a matrix, data.frame or DataFrame. Current class:", class(copy_number_data)))
+  }
+
+  if(nrow(L) != G) {
+    stop("copy_number_data must have same number of genes (rows) as gene_expression_data")
+  }
+
+  C <- ncol(L)
+
+  # Sort the size factors
+  if(is.null(s)) {
+    s <- colSums(Y)
+  }
+
+  # Compute mse on full data set
+  observed_mse <- compute_ca_fit_mse(clonealign_fit, Y, L)
+  null_mse <- replicate(n_samples, compute_ca_fit_mse(clonealign_fit,
+                                                Y,
+                                                L,
+                                                random_clones = TRUE))
+
+  cat(glue("On the full dataset, the observed MSE was on average {mean(null_mse) / observed_mse} times smaller than under a null model"))
+  cat(glue(" and smaller {100 * mean(observed_mse < mean(null_mse))}% of the time"))
+  cat("\n")
+
+  # Fix which indices we're going to hold out
+  all_inds <- seq_len(G)
+  heldout_inds <- sample(all_inds, round(prop_holdout * G))
+  kept_inds <- setdiff(all_inds, heldout_inds)
+
+  # Fit reduced clonealign model
+  message("Fitting reduced clonealign model...")
+  ca <- clonealign(Y[, kept_inds], L[kept_inds,], verbose = FALSE, ...)
+
+  tbl <- table(ca$clone, clonealign_fit$clone)
+
+  # plot(tbl, main = 'Agreement between original (rows) and reduced (columns)')
+
+  cat("Agreement between original (rows) and reduced (columns):")
+  print(tbl)
+
+  # Compute mse on held out:
+  observed_mse_ho <- compute_ca_fit_mse(ca, Y[, heldout_inds], L[heldout_inds,], model_mu = FALSE)
+  null_mse_ho <- replicate(n_samples, compute_ca_fit_mse(ca, Y[, heldout_inds], L[heldout_inds,], model_mu = FALSE, random_clones = TRUE))
+
+  cat(glue("On the held-out dataset, the observed MSE was on average {mean(null_mse_ho) / observed_mse_ho} times smaller than under a null model"))
+  cat(glue(" and smaller {100 * mean(observed_mse_ho < mean(null_mse_ho))}% of the time"))
+  cat("\n")
+
+  list(
+    full_clonealign_fit = clonealign_fit,
+    full_observed_mse = observed_mse,
+    full_null_mse = null_mse,
+    reduced_clonealign_fit = ca,
+    heldout_inds = heldout_inds,
+    kept_inds = kept_inds,
+    heldout_observed_mse = observed_mse_ho,
+    heldout_null_mse = null_mse_ho
+  )
+
+}
+
+#' Compute mean squared error of a clonealign fit
+#'
+#' @keywords internal
+#'
+#' @return The mean square error of the clonealign fit on the given expression data using
+#' the provided clones
+compute_ca_fit_mse <- function(fit, Y, L, model_mu = TRUE, random_clones = FALSE) {
+  clones <- fit$clone
+  if(random_clones) {
+    distinct_clones <- unique(clones)
+    clones <- sample(distinct_clones, nrow(Y), replace = TRUE)
+  }
+  predicted_expression <- L[,clones] # G by N
+  if(model_mu) {
+    mu <- as.vector(fit$ml_params$mu)
+    prediced_expression <- mu * predicted_expression
+  }
+  normalizer <- rowSums(Y) / colSums(predicted_expression)
+  predicted_expression <- t(predicted_expression) * normalizer
+  mse <- mean((predicted_expression - Y)^2)
+  mse
+}
+
 
 

@@ -6,9 +6,10 @@
 \usage{
 clonealign(gene_expression_data, copy_number_data, max_iter_em = 100,
   max_iter_adam = 1, rel_tol_em = 1e-06, rel_tol_adam = 1e-06,
-  gene_filter_threshold = 0, learning_rate = 0.1, fix_alpha = TRUE,
-  clone_specific_phi = TRUE, fix_s = NULL, sigma_hyper = 1,
-  dtype = "float64", saturate = TRUE, verbose = TRUE)
+  gene_filter_threshold = 0, learning_rate = 0.1, x = NULL,
+  fix_alpha = TRUE, clone_specific_phi = TRUE, fix_s = NULL,
+  sigma_hyper = 1, dtype = "float64", saturate = TRUE,
+  saturation_threshold = 4, K = 1, verbose = TRUE)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -32,6 +33,9 @@ be filtered out (removes genes with no counts by default)}
 
 \item{learning_rate}{The learning rate to be passed to the Adam optimizer}
 
+\item{x}{An optional vector of covariates, e.g. corresponding to batch or patient. Can be a vector of a single
+covariate or a sample by covariate matrix. Note this should not contain an intercept.}
+
 \item{fix_alpha}{Should the underlying priors for clone frequencies be fixed? Default TRUE
 (values are inferred from the data)}
 
@@ -44,7 +48,11 @@ a vector corresponding to the number of cells should be specified.}
 
 \item{dtype}{The dtype for tensorflow useage, either "float32" or "float64"}
 
-\item{saturate}{Should the CNV-expression relationship saturate above copy number = 4? Default TRUE}
+\item{saturate}{Should the CNV-expression relationship saturate above copy number = \code{saturation_threshold}? Default TRUE}
+
+\item{saturation_threshold}{If \code{saturate} is true, copy numbers above this will be reduced to the threshold}
+
+\item{K}{The dimensionality of the expression latent space.}
 
 \item{verbose}{Should warnings and EM convergence information be printed? Default TRUE}
 }

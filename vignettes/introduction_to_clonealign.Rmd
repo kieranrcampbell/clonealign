@@ -193,7 +193,7 @@ plot_clonealign(example_sce, cal$clone, cnv_data,
 
 where the `*_str` identifies the columns of `rowData(example_sce)` to look for the chromosome names and feature start and end positions.
 
-
+## Evaluating the clone assignment
 
 
 # Advanced options

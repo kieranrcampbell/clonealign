@@ -2,6 +2,7 @@
 
 S3method(print,clonealign_fit)
 export(clonealign)
+export(evaluate_clonealign)
 export(plot_clonealign)
 import(ggplot2)
 import(tensorflow)
