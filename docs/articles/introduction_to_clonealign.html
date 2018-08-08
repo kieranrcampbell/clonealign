@@ -183,7 +183,7 @@ example_sce
 <span class="kw">table</span>(clones)
 <span class="co">#&gt; clones</span>
 <span class="co">#&gt;  A  B  C </span>
-<span class="co">#&gt; 68 75 57</span></code></pre></div>
+<span class="co">#&gt; 52 70 78</span></code></pre></div>
 <p>This can easily be added to the <code>SingleCellExperiment</code> for visualization with <code>scater</code>:</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">example_sce<span class="op">$</span>clone &lt;-<span class="st"> </span>clones
 example_sce &lt;-<span class="st"> </span><span class="kw">normalise</span>(example_sce)
@@ -226,6 +226,28 @@ example_sce &lt;-<span class="st"> </span><span class="kw">normalise</span>(exam
 <p><img src="introduction_to_clonealign_files/figure-html/unnamed-chunk-14-1.png" width="700"></p>
 <p>where the <code>*_str</code> identifies the columns of <code>rowData(example_sce)</code> to look for the chromosome names and feature start and end positions.</p>
 </div>
+<div id="evaluating-the-clone-assignment" class="section level2">
+<h2 class="hasAnchor">
+<a href="#evaluating-the-clone-assignment" class="anchor"></a>Evaluating the clone assignment</h2>
+<p><code>clonealign</code> will assign single-cell RNA-seq to clones no matter how good the fit and no matter whether the clones actually exist in the expression data. As a consequence, it is important to evaluate the quality of fit which in practice we do by fitting the clones on a subset of genes and looking at how well the predicted expression profiles fits the observed expression data of the “held-out” genes.</p>
+<p>We perform his out-of-sample evaluation using the <code>evaluate_clonealign</code> function, which takes in the clonealign fit on the full dataset (along with the dataset) and both prints various metrics and returns a list containing various computed objects:</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">ec &lt;-<span class="st"> </span><span class="kw"><a href="../reference/evaluate_clonealign.html">evaluate_clonealign</a></span>(example_sce, cnv_data, cal)
+<span class="co">#&gt; On the full dataset, the observed MSE was on average 1.00444954295787 times smaller than under a null model and smaller 100% of the time</span>
+<span class="co">#&gt; Fitting reduced clonealign model...</span>
+<span class="co">#&gt; Agreement between original (rows) and reduced (columns):   </span>
+<span class="co">#&gt;      A  B  C</span>
+<span class="co">#&gt;   A 33 21  0</span>
+<span class="co">#&gt;   B 19 40 48</span>
+<span class="co">#&gt;   C  0  9 30</span>
+<span class="co">#&gt; On the held-out dataset, the observed MSE was on average 1.00483301775203 times smaller than under a null model and smaller 100% of the time</span></code></pre></div>
+<p>The function call prints several important metrics:</p>
+<ol style="list-style-type: decimal">
+<li>The mean square error (MSE) on the full dataset given the clone assignments, compared to the average MSE under a null distribution found by permuting the clone assignments. If the observed MSE is greater than the null MSE (either on average or a large percent of the time) then the fit is very poor and should be discarded</li>
+<li>The agreement between the clone assignments on the full geneset and under the null geneset. If these are very different then the algorithm is sensitive to the input genes and caution is advised</li>
+<li>The MSE of held-out (out-of-sample) genes using a clonealign fit on an orthogonal test set of genes. Again, if the observed MSE is greater than the null MSE (or approximately the same) then the fit is unreliable and should be discarded.</li>
+</ol>
+<p>These metrics are stored in a list returned by the function call. For details, see the help page at <code><a href="../reference/evaluate_clonealign.html">?evaluate_clonealign</a></code>.</p>
+</div>
 </div>
 <div id="advanced-options" class="section level1">
 <h1 class="hasAnchor">
@@ -251,16 +273,17 @@ example_sce &lt;-<span class="st"> </span><span class="kw">normalise</span>(exam
 <a href="#accessing-maximum-likelihood-parameter-estimates" class="anchor"></a>Accessing maximum-likelihood parameter estimates</h2>
 <p>The object returned by a call to <code>clonealign</code> contains a <code>clone</code> slot for the maximum likelihood (ML) clone assignment for each cell. The ML estimates of the other parameters can be found in the <code>cal$ml_params</code> slot:</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">names</span>(cal<span class="op">$</span>ml_params)
-<span class="co">#&gt; [1] "clone_probs" "mu"          "s"           "phi"</span></code></pre></div>
+<span class="co">#&gt; [1] "clone_probs" "mu"          "s"           "phi"         "alpha"      </span>
+<span class="co">#&gt; [6] "phi_bar"     "psi"         "W"</span></code></pre></div>
 <p>The slot <code>clone_probs</code> gives the probability that each cell is assigned to each clone:</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">head</span>(cal<span class="op">$</span>ml_params<span class="op">$</span>clone_probs)
-<span class="co">#&gt;                 A         B         C</span>
-<span class="co">#&gt; [1,] 0.0485277474 0.5841722 0.3673017</span>
-<span class="co">#&gt; [2,] 0.0001137902 0.3025147 0.6973726</span>
-<span class="co">#&gt; [3,] 0.0275536180 0.2143368 0.7581062</span>
-<span class="co">#&gt; [4,] 0.0966688618 0.7310576 0.1722717</span>
-<span class="co">#&gt; [5,] 0.0001145939 0.1038677 0.8960181</span>
-<span class="co">#&gt; [6,] 0.1605246812 0.6634352 0.1760405</span></code></pre></div>
+<span class="co">#&gt;                 A          B         C</span>
+<span class="co">#&gt; [1,] 9.105823e-03 0.16636684 0.8245273</span>
+<span class="co">#&gt; [2,] 5.986481e-05 0.17998142 0.8199587</span>
+<span class="co">#&gt; [3,] 1.290948e-03 0.01003277 0.9886763</span>
+<span class="co">#&gt; [4,] 7.212678e-02 0.39464347 0.5332298</span>
+<span class="co">#&gt; [5,] 3.143761e-04 0.47834323 0.5213424</span>
+<span class="co">#&gt; [6,] 1.785577e-01 0.69487485 0.1265675</span></code></pre></div>
 <p>while <code>mu</code> and <code>phi</code> give the maximum likelihood estimates of the <span class="math inline">\(\mu\)</span> and <span class="math inline">\(\phi\)</span> parameters from the model.</p>
 </div>
 </div>
@@ -268,77 +291,81 @@ example_sce &lt;-<span class="st"> </span><span class="kw">normalise</span>(exam
 <h1 class="hasAnchor">
 <a href="#technical" class="anchor"></a>Technical</h1>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">sessionInfo</span>()
-<span class="co">#&gt; R version 3.4.2 (2017-09-28)</span>
-<span class="co">#&gt; Platform: x86_64-apple-darwin15.6.0 (64-bit)</span>
-<span class="co">#&gt; Running under: macOS Sierra 10.12.6</span>
+<span class="co">#&gt; R version 3.5.0 (2018-04-23)</span>
+<span class="co">#&gt; Platform: x86_64-pc-linux-gnu (64-bit)</span>
+<span class="co">#&gt; Running under: Debian GNU/Linux 9 (stretch)</span>
 <span class="co">#&gt; </span>
 <span class="co">#&gt; Matrix products: default</span>
-<span class="co">#&gt; BLAS: /Library/Frameworks/R.framework/Versions/3.4/Resources/lib/libRblas.0.dylib</span>
-<span class="co">#&gt; LAPACK: /Library/Frameworks/R.framework/Versions/3.4/Resources/lib/libRlapack.dylib</span>
+<span class="co">#&gt; BLAS: /usr/lib/openblas-base/libblas.so.3</span>
+<span class="co">#&gt; LAPACK: /usr/lib/libopenblasp-r0.2.19.so</span>
 <span class="co">#&gt; </span>
 <span class="co">#&gt; locale:</span>
-<span class="co">#&gt; [1] en_CA.UTF-8/en_CA.UTF-8/en_CA.UTF-8/C/en_CA.UTF-8/en_CA.UTF-8</span>
+<span class="co">#&gt;  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              </span>
+<span class="co">#&gt;  [3] LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    </span>
+<span class="co">#&gt;  [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=C             </span>
+<span class="co">#&gt;  [7] LC_PAPER=en_US.UTF-8       LC_NAME=C                 </span>
+<span class="co">#&gt;  [9] LC_ADDRESS=C               LC_TELEPHONE=C            </span>
+<span class="co">#&gt; [11] LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       </span>
 <span class="co">#&gt; </span>
 <span class="co">#&gt; attached base packages:</span>
 <span class="co">#&gt; [1] parallel  stats4    stats     graphics  grDevices utils     datasets </span>
 <span class="co">#&gt; [8] methods   base     </span>
 <span class="co">#&gt; </span>
 <span class="co">#&gt; other attached packages:</span>
-<span class="co">#&gt;  [1] bindrcpp_0.2               clonealign_0.99.0         </span>
-<span class="co">#&gt;  [3] dplyr_0.7.4                scater_1.6.0              </span>
-<span class="co">#&gt;  [5] ggplot2_2.2.1              SingleCellExperiment_1.0.0</span>
-<span class="co">#&gt;  [7] SummarizedExperiment_1.8.1 DelayedArray_0.4.1        </span>
-<span class="co">#&gt;  [9] matrixStats_0.53.0         Biobase_2.38.0            </span>
-<span class="co">#&gt; [11] GenomicRanges_1.30.1       GenomeInfoDb_1.14.0       </span>
-<span class="co">#&gt; [13] IRanges_2.12.0             S4Vectors_0.16.0          </span>
-<span class="co">#&gt; [15] BiocGenerics_0.24.0        BiocStyle_2.6.1           </span>
+<span class="co">#&gt;  [1] bindrcpp_0.2.2              clonealign_0.99.0          </span>
+<span class="co">#&gt;  [3] dplyr_0.7.5                 scater_1.8.0               </span>
+<span class="co">#&gt;  [5] ggplot2_2.2.1               SingleCellExperiment_1.2.0 </span>
+<span class="co">#&gt;  [7] SummarizedExperiment_1.10.1 DelayedArray_0.6.1         </span>
+<span class="co">#&gt;  [9] BiocParallel_1.14.1         matrixStats_0.53.1         </span>
+<span class="co">#&gt; [11] Biobase_2.40.0              GenomicRanges_1.32.3       </span>
+<span class="co">#&gt; [13] GenomeInfoDb_1.16.0         IRanges_2.14.10            </span>
+<span class="co">#&gt; [15] S4Vectors_0.18.3            BiocGenerics_0.26.0        </span>
+<span class="co">#&gt; [17] BiocStyle_2.8.2            </span>
 <span class="co">#&gt; </span>
 <span class="co">#&gt; loaded via a namespace (and not attached):</span>
-<span class="co">#&gt;  [1] bitops_1.0-6            fs_1.2.2               </span>
-<span class="co">#&gt;  [3] bit64_0.9-7             RColorBrewer_1.1-2     </span>
-<span class="co">#&gt;  [5] progress_1.1.2          httr_1.3.1             </span>
-<span class="co">#&gt;  [7] rprojroot_1.3-2         tools_3.4.2            </span>
-<span class="co">#&gt;  [9] backports_1.1.2         R6_2.2.2               </span>
-<span class="co">#&gt; [11] vipor_0.4.5             DBI_0.7                </span>
-<span class="co">#&gt; [13] lazyeval_0.2.1          colorspace_1.3-2       </span>
-<span class="co">#&gt; [15] tidyselect_0.2.4        gridExtra_2.3          </span>
-<span class="co">#&gt; [17] prettyunits_1.0.2       bit_1.1-12             </span>
-<span class="co">#&gt; [19] compiler_3.4.2          xml2_1.2.0             </span>
-<span class="co">#&gt; [21] desc_1.1.1              labeling_0.3           </span>
-<span class="co">#&gt; [23] bookdown_0.5            scales_0.5.0.9000      </span>
-<span class="co">#&gt; [25] tfruns_1.3              pkgdown_1.0.0.9000     </span>
-<span class="co">#&gt; [27] commonmark_1.4          stringr_1.3.0          </span>
-<span class="co">#&gt; [29] digest_0.6.15           rmarkdown_1.9          </span>
-<span class="co">#&gt; [31] XVector_0.18.0          base64enc_0.1-3        </span>
-<span class="co">#&gt; [33] pkgconfig_2.0.1         htmltools_0.3.6        </span>
-<span class="co">#&gt; [35] limma_3.34.0            rlang_0.2.0            </span>
-<span class="co">#&gt; [37] rstudioapi_0.7          RSQLite_2.0            </span>
-<span class="co">#&gt; [39] shiny_1.0.5             bindr_0.1              </span>
-<span class="co">#&gt; [41] jsonlite_1.5            tensorflow_1.5         </span>
-<span class="co">#&gt; [43] RCurl_1.95-4.10         magrittr_1.5           </span>
-<span class="co">#&gt; [45] GenomeInfoDbData_0.99.1 Matrix_1.2-11          </span>
-<span class="co">#&gt; [47] Rcpp_0.12.16            ggbeeswarm_0.6.0       </span>
-<span class="co">#&gt; [49] munsell_0.4.3           reticulate_1.6         </span>
-<span class="co">#&gt; [51] viridis_0.4.0           whisker_0.3-2          </span>
-<span class="co">#&gt; [53] stringi_1.1.7           yaml_2.1.18            </span>
-<span class="co">#&gt; [55] edgeR_3.20.1            MASS_7.3-47            </span>
-<span class="co">#&gt; [57] zlibbioc_1.24.0         rhdf5_2.22.0           </span>
-<span class="co">#&gt; [59] plyr_1.8.4              grid_3.4.2             </span>
-<span class="co">#&gt; [61] blob_1.1.0              shinydashboard_0.6.1   </span>
-<span class="co">#&gt; [63] crayon_1.3.4            lattice_0.20-35        </span>
-<span class="co">#&gt; [65] cowplot_0.9.2           locfit_1.5-9.1         </span>
-<span class="co">#&gt; [67] knitr_1.20              pillar_1.2.2           </span>
-<span class="co">#&gt; [69] rjson_0.2.15            reshape2_1.4.3         </span>
-<span class="co">#&gt; [71] biomaRt_2.34.1          XML_3.98-1.9           </span>
-<span class="co">#&gt; [73] glue_1.2.0              evaluate_0.10.1        </span>
-<span class="co">#&gt; [75] data.table_1.10.4-3     httpuv_1.3.5           </span>
-<span class="co">#&gt; [77] purrr_0.2.4             tidyr_0.7.2            </span>
-<span class="co">#&gt; [79] gtable_0.2.0            assertthat_0.2.0       </span>
-<span class="co">#&gt; [81] mime_0.5                xtable_1.8-2           </span>
-<span class="co">#&gt; [83] roxygen2_6.0.1          viridisLite_0.2.0      </span>
-<span class="co">#&gt; [85] tibble_1.4.2            AnnotationDbi_1.40.0   </span>
-<span class="co">#&gt; [87] beeswarm_0.2.3          memoise_1.1.0          </span>
-<span class="co">#&gt; [89] tximport_1.6.0</span></code></pre></div>
+<span class="co">#&gt;  [1] bitops_1.0-6             fs_1.2.2                </span>
+<span class="co">#&gt;  [3] RColorBrewer_1.1-2       progress_1.2.0          </span>
+<span class="co">#&gt;  [5] rprojroot_1.3-2          tools_3.5.0             </span>
+<span class="co">#&gt;  [7] backports_1.1.2          R6_2.2.2                </span>
+<span class="co">#&gt;  [9] vipor_0.4.5              lazyeval_0.2.1          </span>
+<span class="co">#&gt; [11] colorspace_1.3-2         prettyunits_1.0.2       </span>
+<span class="co">#&gt; [13] tidyselect_0.2.4         gridExtra_2.3           </span>
+<span class="co">#&gt; [15] compiler_3.5.0           xml2_1.2.0              </span>
+<span class="co">#&gt; [17] desc_1.2.0               labeling_0.3            </span>
+<span class="co">#&gt; [19] bookdown_0.7             scales_0.5.0            </span>
+<span class="co">#&gt; [21] tfruns_1.3               pkgdown_1.0.0           </span>
+<span class="co">#&gt; [23] commonmark_1.5           stringr_1.3.1           </span>
+<span class="co">#&gt; [25] digest_0.6.15            rmarkdown_1.10          </span>
+<span class="co">#&gt; [27] XVector_0.20.0           base64enc_0.1-3         </span>
+<span class="co">#&gt; [29] pkgconfig_2.0.1          htmltools_0.3.6         </span>
+<span class="co">#&gt; [31] limma_3.36.2             rlang_0.2.1             </span>
+<span class="co">#&gt; [33] rstudioapi_0.7           shiny_1.1.0             </span>
+<span class="co">#&gt; [35] DelayedMatrixStats_1.2.0 bindr_0.1.1             </span>
+<span class="co">#&gt; [37] jsonlite_1.5             tensorflow_1.5          </span>
+<span class="co">#&gt; [39] RCurl_1.95-4.10          magrittr_1.5            </span>
+<span class="co">#&gt; [41] GenomeInfoDbData_1.1.0   Matrix_1.2-14           </span>
+<span class="co">#&gt; [43] Rcpp_0.12.17             ggbeeswarm_0.6.0        </span>
+<span class="co">#&gt; [45] munsell_0.5.0            Rhdf5lib_1.2.1          </span>
+<span class="co">#&gt; [47] reticulate_1.8           viridis_0.5.1           </span>
+<span class="co">#&gt; [49] whisker_0.3-2            stringi_1.2.2           </span>
+<span class="co">#&gt; [51] yaml_2.1.19              edgeR_3.22.3            </span>
+<span class="co">#&gt; [53] MASS_7.3-50              zlibbioc_1.26.0         </span>
+<span class="co">#&gt; [55] rhdf5_2.24.0             plyr_1.8.4              </span>
+<span class="co">#&gt; [57] grid_3.5.0               promises_1.0.1          </span>
+<span class="co">#&gt; [59] shinydashboard_0.7.0     crayon_1.3.4            </span>
+<span class="co">#&gt; [61] lattice_0.20-35          cowplot_0.9.2           </span>
+<span class="co">#&gt; [63] hms_0.4.2                locfit_1.5-9.1          </span>
+<span class="co">#&gt; [65] knitr_1.20               pillar_1.2.3            </span>
+<span class="co">#&gt; [67] rjson_0.2.20             reshape2_1.4.3          </span>
+<span class="co">#&gt; [69] glue_1.2.0               evaluate_0.10.1         </span>
+<span class="co">#&gt; [71] data.table_1.11.4        httpuv_1.4.3            </span>
+<span class="co">#&gt; [73] tidyr_0.8.1              gtable_0.2.0            </span>
+<span class="co">#&gt; [75] purrr_0.2.5              assertthat_0.2.0        </span>
+<span class="co">#&gt; [77] xfun_0.2                 mime_0.5                </span>
+<span class="co">#&gt; [79] xtable_1.8-2             roxygen2_6.0.1          </span>
+<span class="co">#&gt; [81] later_0.7.3              viridisLite_0.3.0       </span>
+<span class="co">#&gt; [83] tibble_1.4.2             beeswarm_0.2.3          </span>
+<span class="co">#&gt; [85] memoise_1.1.0            tximport_1.8.0</span></code></pre></div>
 </div>
 <div id="references" class="section level1 unnumbered">
 <h1 class="hasAnchor">
@@ -363,6 +390,7 @@ example_sce &lt;-<span class="st"> </span><span class="kw">normalise</span>(exam
 <li><a href="#data-preparation">Data preparation</a></li>
       <li><a href="#model-fitting">Model fitting</a></li>
       <li><a href="#plotting-results">Plotting results</a></li>
+      <li><a href="#evaluating-the-clone-assignment">Evaluating the clone assignment</a></li>
       </ul>
 </li>
       <li>

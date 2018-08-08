@@ -1,6 +1,6 @@
 pandoc: 1.19.2.1
-pkgdown: 1.0.0.9000
-pkgdown_sha: c2c84b7fb1be54096e6d9cfbd8d3b62bcec510d2
+pkgdown: 1.0.0
+pkgdown_sha: ~
 articles:
   introduction_to_clonealign: introduction_to_clonealign.html
 

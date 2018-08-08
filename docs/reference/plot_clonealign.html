@@ -183,15 +183,39 @@ and <code>end_str == "end_position"</code>.</p>
 
     <h2 class="hasAnchor" id="examples"><a class="anchor" href="#examples"></a>Examples</h2>
     <pre class="examples"><div class='input'><span class='fu'>library</span>(<span class='no'>SingleCellExperiment</span>)
-<span class='fu'>library</span>(<span class='no'>scater</span>)
-<span class='fu'>library</span>(<span class='no'>dplyr</span>)
-<span class='fu'>data</span>(<span class='no'>example_clonealign_fit</span>)
+<span class='fu'>library</span>(<span class='no'>scater</span>)</div><div class='output co'>#&gt; <span class='message'>Loading required package: ggplot2</span></div><div class='output co'>#&gt; <span class='message'></span>
+#&gt; <span class='message'>Attaching package: ‘scater’</span></div><div class='output co'>#&gt; <span class='message'>The following object is masked from ‘package:S4Vectors’:</span>
+#&gt; <span class='message'></span>
+#&gt; <span class='message'>    rename</span></div><div class='output co'>#&gt; <span class='message'>The following object is masked from ‘package:stats’:</span>
+#&gt; <span class='message'></span>
+#&gt; <span class='message'>    filter</span></div><div class='input'><span class='fu'>library</span>(<span class='no'>dplyr</span>)</div><div class='output co'>#&gt; <span class='message'></span>
+#&gt; <span class='message'>Attaching package: ‘dplyr’</span></div><div class='output co'>#&gt; <span class='message'>The following objects are masked from ‘package:scater’:</span>
+#&gt; <span class='message'></span>
+#&gt; <span class='message'>    arrange, filter, mutate, rename</span></div><div class='output co'>#&gt; <span class='message'>The following object is masked from ‘package:matrixStats’:</span>
+#&gt; <span class='message'></span>
+#&gt; <span class='message'>    count</span></div><div class='output co'>#&gt; <span class='message'>The following objects are masked from ‘package:Biobase’:</span>
+#&gt; <span class='message'></span>
+#&gt; <span class='message'>    combine, exprs</span></div><div class='output co'>#&gt; <span class='message'>The following objects are masked from ‘package:GenomicRanges’:</span>
+#&gt; <span class='message'></span>
+#&gt; <span class='message'>    intersect, setdiff, union</span></div><div class='output co'>#&gt; <span class='message'>The following object is masked from ‘package:GenomeInfoDb’:</span>
+#&gt; <span class='message'></span>
+#&gt; <span class='message'>    intersect</span></div><div class='output co'>#&gt; <span class='message'>The following objects are masked from ‘package:IRanges’:</span>
+#&gt; <span class='message'></span>
+#&gt; <span class='message'>    collapse, desc, intersect, setdiff, slice, union</span></div><div class='output co'>#&gt; <span class='message'>The following objects are masked from ‘package:S4Vectors’:</span>
+#&gt; <span class='message'></span>
+#&gt; <span class='message'>    first, intersect, rename, setdiff, setequal, union</span></div><div class='output co'>#&gt; <span class='message'>The following objects are masked from ‘package:BiocGenerics’:</span>
+#&gt; <span class='message'></span>
+#&gt; <span class='message'>    combine, intersect, setdiff, union</span></div><div class='output co'>#&gt; <span class='message'>The following objects are masked from ‘package:stats’:</span>
+#&gt; <span class='message'></span>
+#&gt; <span class='message'>    filter, lag</span></div><div class='output co'>#&gt; <span class='message'>The following objects are masked from ‘package:base’:</span>
+#&gt; <span class='message'></span>
+#&gt; <span class='message'>    intersect, setdiff, setequal, union</span></div><div class='input'><span class='fu'>data</span>(<span class='no'>example_clonealign_fit</span>)
 <span class='no'>cnv_data</span> <span class='kw'>&lt;-</span> <span class='fu'>rowData</span>(<span class='no'>example_sce</span>)[,<span class='fu'>c</span>(<span class='st'>"A"</span>, <span class='st'>"B"</span>, <span class='st'>"C"</span>)]
 <span class='no'>gene_position</span> <span class='kw'>&lt;-</span> <span class='fu'><a href='http://dplyr.tidyverse.org/reference/reexports.html'>as_data_frame</a></span>(<span class='no'>cnv_data</span>) <span class='kw'>%&gt;%</span>
-<span class='fu'><a href='http://www.rdocumentation.org/packages/scater/topics/mutate'>mutate</a></span>(<span class='kw'>gene</span> <span class='kw'>=</span> <span class='fu'>seq_len</span>(<span class='fu'>nrow</span>(<span class='no'>cnv_data</span>))) <span class='kw'>%&gt;%</span>
-  <span class='fu'><a href='http://www.rdocumentation.org/packages/scater/topics/arrange'>arrange</a></span>(<span class='no'>A</span>, <span class='no'>B</span>, <span class='no'>C</span>) <span class='kw'>%&gt;%</span>
- <span class='fu'><a href='http://www.rdocumentation.org/packages/scater/topics/mutate'>mutate</a></span>(<span class='kw'>position</span> <span class='kw'>=</span> <span class='fu'>seq_len</span>(<span class='fu'>nrow</span>(<span class='no'>cnv_data</span>))) <span class='kw'>%&gt;%</span>
-  <span class='fu'><a href='http://www.rdocumentation.org/packages/scater/topics/arrange'>arrange</a></span>(<span class='no'>gene</span>) <span class='kw'>%&gt;%</span>
+<span class='fu'><a href='http://dplyr.tidyverse.org/reference/mutate.html'>mutate</a></span>(<span class='kw'>gene</span> <span class='kw'>=</span> <span class='fu'>seq_len</span>(<span class='fu'>nrow</span>(<span class='no'>cnv_data</span>))) <span class='kw'>%&gt;%</span>
+  <span class='fu'><a href='http://dplyr.tidyverse.org/reference/arrange.html'>arrange</a></span>(<span class='no'>A</span>, <span class='no'>B</span>, <span class='no'>C</span>) <span class='kw'>%&gt;%</span>
+ <span class='fu'><a href='http://dplyr.tidyverse.org/reference/mutate.html'>mutate</a></span>(<span class='kw'>position</span> <span class='kw'>=</span> <span class='fu'>seq_len</span>(<span class='fu'>nrow</span>(<span class='no'>cnv_data</span>))) <span class='kw'>%&gt;%</span>
+  <span class='fu'><a href='http://dplyr.tidyverse.org/reference/arrange.html'>arrange</a></span>(<span class='no'>gene</span>) <span class='kw'>%&gt;%</span>
   <span class='no'>.</span>$<span class='no'>position</span></div><div class='output co'>#&gt; <span class='warning'>Warning: Arguments in '...' ignored</span></div><div class='input'>
 <span class='fu'>rowData</span>(<span class='no'>example_sce</span>)$<span class='no'>chromosome</span> <span class='kw'>&lt;-</span> <span class='st'>"1"</span>
 <span class='fu'>rowData</span>(<span class='no'>example_sce</span>)$<span class='no'>start_pos</span> <span class='kw'>&lt;-</span> <span class='no'>gene_position</span>
