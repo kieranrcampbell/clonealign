@@ -107,6 +107,7 @@ clonealign <- function(gene_expression_data,
                        saturate = TRUE,
                        saturation_threshold = 4,
                        K = 1,
+                       B = 10,
                        verbose = TRUE) {
 
   N <- NA # Number of cells
@@ -164,6 +165,7 @@ clonealign <- function(gene_expression_data,
                                saturate = saturate,
                                saturation_threshold = saturation_threshold,
                                K = K,
+                               B = B,
                                verbose = verbose)
 
   rlist <- list(
@@ -176,7 +178,8 @@ clonealign <- function(gene_expression_data,
     s = tflow_res$s,
     phi = tflow_res$phi,
     alpha = tflow_res$alpha,
-    phi_bar = tflow_res$phi_bar,
+    a = tflow_res$a,
+    b = tflow_res$b,
     psi = tflow_res$psi,
     W = tflow_res$W
   )
@@ -186,6 +189,7 @@ clonealign <- function(gene_expression_data,
   rlist$ml_params <- ml_params
   rlist$log_lik <- tflow_res$log_lik
   rlist$retained_genes <- tflow_res$retained_genes
+  rlist$basis_means <- tflow_res$basis_means
 
   # Finally map clone names back to fitted values
   clone_names <- colnames(L)
@@ -453,6 +457,23 @@ compute_ca_fit_mse <- function(fit, Y, L, model_mu = TRUE, random_clones = FALSE
   mse <- mean((predicted_expression - Y)^2)
   mse
 }
+
+#' @export
+plot_dispersion_relationship <- function(em) {
+  basis_means <- em$basis_means
+  a <- em$ml_params$a
+  b <- em$ml_params$b
+  x <- seq(from = min(basis_means), to = max(basis_means), length.out = 1000)
+
+  y <- sapply(x, function(xx) {
+    sum( a * exp(-b*(xx - basis_means)^2) )
+  })
+
+  qplot(x, y, geom = 'line') +
+    labs(x = expression(mu), y = expression(phi))
+}
+
+
 
 
 
