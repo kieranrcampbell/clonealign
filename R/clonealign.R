@@ -30,7 +30,8 @@
 #' @param verbose Should warnings and EM convergence information be printed? Default TRUE
 #' @param x An optional vector of covariates, e.g. corresponding to batch or patient. Can be a vector of a single
 #' covariate or a sample by covariate matrix. Note this should not contain an intercept.
-#' @param K The dimensionality of the expression latent space.
+#' @param K The dimensionality of the expression latent space. If left \code{NULL}, K is set to 1 if fewer than 100 genes
+#' are present and 4 otherwise.
 #'
 #'
 #' @details
@@ -99,15 +100,13 @@ clonealign <- function(gene_expression_data,
                        gene_filter_threshold = 0,
                        learning_rate = 0.1,
                        x = NULL,
-                       fix_alpha = TRUE,
-                       clone_specific_phi = TRUE,
+                       fix_alpha = FALSE,
                        fix_s = NULL,
-                       sigma_hyper = 1.0,
                        dtype = "float64",
                        saturate = TRUE,
                        saturation_threshold = 4,
-                       K = 1,
-                       B = 10,
+                       K = NULL,
+                       B = 20,
                        verbose = TRUE) {
 
   N <- NA # Number of cells
@@ -129,6 +128,14 @@ clonealign <- function(gene_expression_data,
   }
   N <- nrow(Y)
   G <- ncol(Y)
+
+  if(is.null(K)) {
+    if(G <= 100) {
+      K <- 1
+    } else {
+      K <- 4
+    }
+  }
 
 
 
@@ -158,9 +165,7 @@ clonealign <- function(gene_expression_data,
                                gene_filter_threshold = gene_filter_threshold,
                                x = x,
                                fix_alpha = fix_alpha,
-                               clone_specific_phi = clone_specific_phi,
                                fix_s = fix_s,
-                               sigma_hyper = sigma_hyper,
                                dtype = dtype,
                                saturate = saturate,
                                saturation_threshold = saturation_threshold,

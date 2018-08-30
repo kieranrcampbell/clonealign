@@ -9,7 +9,7 @@ clonealign(gene_expression_data, copy_number_data, max_iter_em = 100,
   gene_filter_threshold = 0, learning_rate = 0.1, x = NULL,
   fix_alpha = TRUE, clone_specific_phi = TRUE, fix_s = NULL,
   sigma_hyper = 1, dtype = "float64", saturate = TRUE,
-  saturation_threshold = 4, K = 1, verbose = TRUE)
+  saturation_threshold = 4, K = NULL, B = 10, verbose = TRUE)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -52,7 +52,8 @@ a vector corresponding to the number of cells should be specified.}
 
 \item{saturation_threshold}{If \code{saturate} is true, copy numbers above this will be reduced to the threshold}
 
-\item{K}{The dimensionality of the expression latent space.}
+\item{K}{The dimensionality of the expression latent space. If left \code{NULL}, K is set to 1 if fewer than 100 genes
+are present and 4 otherwise.}
 
 \item{verbose}{Should warnings and EM convergence information be printed? Default TRUE}
 }

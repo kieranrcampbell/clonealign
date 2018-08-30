@@ -37,14 +37,12 @@ inference_tflow <- function(Y_dat,
                             gene_filter_threshold = 0,
                             x = NULL,
                             fix_alpha = FALSE,
-                            clone_specific_phi = TRUE,
                             fix_s = NULL,
-                            sigma_hyper = 1,
                             dtype = c("float32", "float64"),
                             saturate = TRUE,
                             saturation_threshold = 4,
                             K = 1,
-                            B = 10,
+                            B = 20,
                             verbose = TRUE) {
 
   # Do a first check that we actually have tensorflow support
@@ -55,8 +53,12 @@ inference_tflow <- function(Y_dat,
     stop(msg)
   }
 
+
   # Reset graph
   tf$reset_default_graph()
+
+  # Get distributions
+  tfd <- tf$contrib$distributions
 
   # Sort out the dtype
   dtype <- match.arg(dtype)
@@ -114,8 +116,7 @@ inference_tflow <- function(Y_dat,
   ## Added 8-8-2018
   B <- as.integer(B)
 
-  # basis_means_fixed <- quantile(y_means, probs = seq(0, 1, length.out = B))
-  basis_means_fixed <- seq(from = min(Y_dat), to = max(Y_dat), length.out = B)
+  basis_means_fixed <- seq(from = min(Y_dat), to = max(Y_dat+1), length.out = B)
   basis_means <- tf$constant(basis_means_fixed, dtype = dtype)
 
   b_init <- 2 * (basis_means_fixed[2] - basis_means_fixed[1])^2
@@ -145,11 +146,11 @@ inference_tflow <- function(Y_dat,
 
   # Spline variables
   a <- tf$exp(tf$Variable(tf$zeros(shape = B, dtype = dtype)))
-  # b <- tf$exp(tf$Variable(tf$constant(rep(-log(b_init), B), dtype = dtype)))
   b <- tf$exp(tf$constant(rep(-log(b_init), B), dtype = dtype))
 
   # Variables ------
   W <- tf$Variable(tf$zeros(shape = c(G, K), dtype = dtype))
+  chi <- tf$exp(tf$get_variable("chi", initializer = tf$zeros(K, dtype = dtype))) # Prior variance on W
   psi <- tf$Variable(tf$constant(pcs, dtype = dtype))
   psi_times_W <- tf$matmul(psi, W, transpose_b = TRUE)
   if(P > 0) {
@@ -165,16 +166,6 @@ inference_tflow <- function(Y_dat,
   } else {
     s <- tf$exp(tf$Variable(tf$constant(log(s_init), dtype = dtype))) + LOWER_BOUND
   }
-
-  # phi <- NULL
-  # if(clone_specific_phi) {
-  #   phi <- tf$exp(tf$Variable(tf$constant(value = 0, shape = shape(C,G), dtype = dtype))) + LOWER_BOUND
-  # } else {
-  #   phi <- tf$exp(tf$Variable(tf$zeros(shape(G), dtype = dtype))) + LOWER_BOUND
-  # }
-  #
-  # phi_bar <- tf$Variable(tf$ones(G, dtype = dtype))
-  # sigma_log <- tf$constant(log(sigma_hyper), dtype = dtype)
 
 
   log_alpha <- NULL
@@ -194,10 +185,12 @@ inference_tflow <- function(Y_dat,
   mu <- tf$squeeze(mu)
 
   random_fixed_effects <- NULL
-  if(P == 0) {
+  if(P == 0 && K > 0) {
     random_fixed_effects <- tf$exp(psi_times_W)
-  } else {
+  } else if(P > 0 && K > 0) {
     random_fixed_effects <- tf$exp(psi_times_W + X_times_beta)
+  } else {
+    random_fixed_effects <- tf$ones(shape = shape(N,G))
   }
 
   mu_cg <- tf$transpose(L) * mu
@@ -211,7 +204,7 @@ inference_tflow <- function(Y_dat,
 
 
   p <- (mu_ncg) / (mu_ncg + phi)
-  y_pdf <- tf$contrib$distributions$NegativeBinomial(probs = p, total_count = phi)
+  y_pdf <- tfd$NegativeBinomial(probs = p, total_count = phi)
   Y_tiled <- tf$stack(rep(list(Y), data$C), axis = 1)
   y_log_prob <- y_pdf$log_prob(Y_tiled)
 
@@ -221,20 +214,28 @@ inference_tflow <- function(Y_dat,
 
   gamma <- tf$exp(tf$transpose(tf$transpose(p_y_on_c) - p_y_on_c_norm))
 
-  # Prior on phi
-  # phi_pdf <- tf$contrib$distributions$Normal(loc = phi_bar, scale = tf$exp(sigma_log))
-  # p_phi <- phi_pdf$log_prob(tf$log(phi))
+  # Prior on w, psi and chi
+  if(K > 0) {
+    W_log_prob <- tf$reduce_sum(tfd$Normal(loc = tf$zeros(1, dtype = dtype),
+                                           scale = tf$sqrt(tf$ones(1, dtype = dtype) / chi))$log_prob(W))
 
-  # Prior on psi
-  psi_pdf <- tf$contrib$distributions$Normal(loc = tf$zeros(1, dtype = dtype), scale = tf$ones(1, dtype = dtype))
-  p_psi <- psi_pdf$log_prob(psi)
+    chi_log_prob <- tf$reduce_sum(tfd$Gamma(concentration = tf$constant(2, dtype = dtype),
+                                              rate = tf$ones(1, dtype = dtype))$log_prob(chi))
+
+    psi_pdf <- tfd$Normal(loc = tf$zeros(1, dtype = dtype), scale = tf$ones(1, dtype = dtype))
+    p_psi <- psi_pdf$log_prob(psi)
+  }
 
   # Q function
   gamma_fixed <- tf$placeholder(dtype = dtype, shape = c(N, C))
 
   y_log_prob_g_sum <- tf$reduce_sum(y_log_prob, 2L) + log_alpha
 
-  Q <- -tf$einsum('nc,nc->', gamma_fixed, y_log_prob_g_sum) - tf$reduce_sum(p_psi)
+  Q <- -tf$einsum('nc,nc->', gamma_fixed, y_log_prob_g_sum)
+
+  if(K > 0) {
+    Q <- Q - tf$reduce_sum(p_psi) - W_log_prob - chi_log_prob
+  }
 
   optimizer <- tf$train$AdamOptimizer(learning_rate = learning_rate)
   train <- optimizer$minimize(Q)
@@ -305,19 +306,28 @@ inference_tflow <- function(Y_dat,
     message("clonealign inference complete")
   }
 
-  rlist <- sess$run(list(mu, gamma, s, phi, tf$exp(log_alpha), a, b, psi, W), feed_dict = fd)
+  rlist <- sess$run(list(mu, gamma, s, phi, tf$exp(log_alpha), a, b), feed_dict = fd)
   if(P > 0) {
     rlist$beta <- sess$run(beta, feed_dict = fd)
+  }
+
+  if(K > 0) {
+    k_params <- sess$run(list(psi, W, chi), feed_dict = fd)
+    rlist$psi <- k_params[[1]]
+    rlist$W <- k_params[[2]]
+    rlist$chi <- k_params[[3]]
   }
 
   # Close the tensorflow session
   sess$close()
 
   rlist$l <- l
-  if(P > 0) {
-    names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "a", "b", "psi", "W", "beta", "log_lik")
+  if(P > 0 && K > 0) {
+    names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "a", "b", "beta", "psi", "W", "chi", "log_lik")
+  } else if (K > 0 && P == 0) {
+    names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "a", "b", "psi", "W", "chi", "log_lik")
   } else {
-    names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "a", "b", "psi", "W", "log_lik")
+    names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "a", "b", "log_lik")
   }
 
   rlist$initial_mu <- initial_mu
