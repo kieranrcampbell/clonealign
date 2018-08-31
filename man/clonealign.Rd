@@ -7,9 +7,8 @@
 clonealign(gene_expression_data, copy_number_data, max_iter_em = 100,
   max_iter_adam = 1, rel_tol_em = 1e-06, rel_tol_adam = 1e-06,
   gene_filter_threshold = 0, learning_rate = 0.1, x = NULL,
-  fix_alpha = TRUE, clone_specific_phi = TRUE, fix_s = NULL,
-  sigma_hyper = 1, dtype = "float64", saturate = TRUE,
-  saturation_threshold = 4, K = NULL, B = 10, verbose = TRUE)
+  fix_alpha = FALSE, fix_s = NULL, dtype = "float64", saturate = TRUE,
+  saturation_threshold = 4, K = NULL, B = 20, verbose = TRUE)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -39,12 +38,8 @@ covariate or a sample by covariate matrix. Note this should not contain an inter
 \item{fix_alpha}{Should the underlying priors for clone frequencies be fixed? Default TRUE
 (values are inferred from the data)}
 
-\item{clone_specific_phi}{Should each clone have distinct over-dispersion parameters? Default TRUE}
-
 \item{fix_s}{Should the size factors be fixed? If \code{NULL} they are jointly inferred from the data, otherwise
 a vector corresponding to the number of cells should be specified.}
-
-\item{sigma_hyper}{The hyperparameter governing shrinkage of clone-specific dispersions}
 
 \item{dtype}{The dtype for tensorflow useage, either "float32" or "float64"}
 
@@ -54,6 +49,8 @@ a vector corresponding to the number of cells should be specified.}
 
 \item{K}{The dimensionality of the expression latent space. If left \code{NULL}, K is set to 1 if fewer than 100 genes
 are present and 4 otherwise.}
+
+\item{B}{Number of basis functions for spline fitting}
 
 \item{verbose}{Should warnings and EM convergence information be printed? Default TRUE}
 }

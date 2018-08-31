@@ -29,11 +29,11 @@ round2 <- function(x) formatC(signif(x,digits=2), digits=2,format="fg", flag="#"
 #' @return A list of maximum likelihood parameter estimates and log likelihood values
 inference_tflow <- function(Y_dat,
                             L_dat,
-                            max_iter_em = 50,
+                            max_iter_em = 100,
                             max_iter_adam = 200,
                             rel_tol_em = 1e-5,
                             rel_tol_adam = 1e-6,
-                            learning_rate = 1e-3,
+                            learning_rate = 0.1,
                             gene_filter_threshold = 0,
                             x = NULL,
                             fix_alpha = FALSE,
@@ -190,7 +190,7 @@ inference_tflow <- function(Y_dat,
   } else if(P > 0 && K > 0) {
     random_fixed_effects <- tf$exp(psi_times_W + X_times_beta)
   } else {
-    random_fixed_effects <- tf$ones(shape = shape(N,G))
+    random_fixed_effects <- tf$ones(shape = shape(N,G), dtype = dtype)
   }
 
   mu_cg <- tf$transpose(L) * mu

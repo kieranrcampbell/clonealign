@@ -20,10 +20,8 @@
 #' @param learning_rate The learning rate to be passed to the Adam optimizer
 #' @param fix_alpha Should the underlying priors for clone frequencies be fixed? Default TRUE
 #' (values are inferred from the data)
-#' @param clone_specific_phi Should each clone have distinct over-dispersion parameters? Default TRUE
 #' @param fix_s Should the size factors be fixed? If \code{NULL} they are jointly inferred from the data, otherwise
 #' a vector corresponding to the number of cells should be specified.
-#' @param sigma_hyper The hyperparameter governing shrinkage of clone-specific dispersions
 #' @param dtype The dtype for tensorflow useage, either "float32" or "float64"
 #' @param saturate Should the CNV-expression relationship saturate above copy number = \code{saturation_threshold}? Default TRUE
 #' @param saturation_threshold If \code{saturate} is true, copy numbers above this will be reduced to the threshold
@@ -32,6 +30,7 @@
 #' covariate or a sample by covariate matrix. Note this should not contain an intercept.
 #' @param K The dimensionality of the expression latent space. If left \code{NULL}, K is set to 1 if fewer than 100 genes
 #' are present and 4 otherwise.
+#' @param B Number of basis functions for spline fitting
 #'
 #'
 #' @details
@@ -463,8 +462,16 @@ compute_ca_fit_mse <- function(fit, Y, L, model_mu = TRUE, random_clones = FALSE
   mse
 }
 
+#' Plot mean dispersion relationship
+#'
+#' @param em An object returned by a call to \code{clonealign}
+#'
+#' @return A \code{ggplot2} plot showing the dispersion as a function of mean
+#' @examples
+#' data(example_clonealign_fit)
+#' plot_mean_dispersion(example_clonealign_fit)
 #' @export
-plot_dispersion_relationship <- function(em) {
+plot_mean_dispersion <- function(em) {
   basis_means <- em$basis_means
   a <- em$ml_params$a
   b <- em$ml_params$b
@@ -474,7 +481,7 @@ plot_dispersion_relationship <- function(em) {
     sum( a * exp(-b*(xx - basis_means)^2) )
   })
 
-  qplot(x, y, geom = 'line') +
+  ggplot2::qplot(x, y, geom = 'line') +
     labs(x = expression(mu), y = expression(phi))
 }
 

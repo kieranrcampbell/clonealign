@@ -13,8 +13,8 @@ Imports:
   tensorflow,
   progress,
   reticulate,
-  ggplot2,
-  dplyr
+  dplyr,
+  ggplot2
 Suggests:
   BiocStyle,
   knitr,
