@@ -231,7 +231,7 @@ inference_tflow <- function(Y_dat,
 
   y_log_prob_g_sum <- tf$reduce_sum(y_log_prob, 2L) + log_alpha
 
-  Q <- -tf$einsum('nc,nc->', gamma_fixed, y_log_prob_g_sum)
+  Q <- -tf$einsum('nc,nc->', gamma_fixed, y_log_prob_g_sum) - tf$reduce_sum(tfd$Dirichlet(tf$constant(2, dtype = dtype) * tf$ones(C, dtype = dtype))$log_prob(tf$exp(log_alpha)))
 
   if(K > 0) {
     Q <- Q - tf$reduce_sum(p_psi) - W_log_prob - chi_log_prob
@@ -326,6 +326,8 @@ inference_tflow <- function(Y_dat,
     names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "a", "b", "beta", "psi", "W", "chi", "log_lik")
   } else if (K > 0 && P == 0) {
     names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "a", "b", "psi", "W", "chi", "log_lik")
+  } else if (K == 0 && P == 0) {
+    names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "a", "b", "beta", "log_lik")
   } else {
     names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "a", "b", "log_lik")
   }
@@ -333,6 +335,7 @@ inference_tflow <- function(Y_dat,
   rlist$initial_mu <- initial_mu
   rlist$retained_genes <- retained_genes
   rlist$basis_means <- basis_means_fixed
+
 
   return(rlist)
 }

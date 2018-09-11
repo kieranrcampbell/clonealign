@@ -29,7 +29,7 @@
 #' @param x An optional vector of covariates, e.g. corresponding to batch or patient. Can be a vector of a single
 #' covariate or a sample by covariate matrix. Note this should not contain an intercept.
 #' @param K The dimensionality of the expression latent space. If left \code{NULL}, K is set to 1 if fewer than 100 genes
-#' are present and 4 otherwise.
+#' are present and 6 otherwise.
 #' @param B Number of basis functions for spline fitting
 #'
 #'
@@ -103,9 +103,9 @@ clonealign <- function(gene_expression_data,
                        fix_s = NULL,
                        dtype = "float64",
                        saturate = TRUE,
-                       saturation_threshold = 4,
+                       saturation_threshold = 5,
                        K = NULL,
-                       B = 20,
+                       B = 10,
                        verbose = TRUE) {
 
   N <- NA # Number of cells
@@ -132,7 +132,7 @@ clonealign <- function(gene_expression_data,
     if(G <= 100) {
       K <- 1
     } else {
-      K <- 4
+      K <- 6
     }
   }
 
@@ -153,6 +153,7 @@ clonealign <- function(gene_expression_data,
 
   C <- ncol(L)
 
+
   # Sanity checking done - time to call em algorithm
   tflow_res <- inference_tflow(Y,
                                L,
@@ -172,6 +173,7 @@ clonealign <- function(gene_expression_data,
                                B = B,
                                verbose = verbose)
 
+
   rlist <- list(
     clone = clone_assignment(tflow_res)
   )
@@ -180,15 +182,20 @@ clonealign <- function(gene_expression_data,
     clone_probs = tflow_res$gamma,
     mu = tflow_res$mu,
     s = tflow_res$s,
-    phi = tflow_res$phi,
     alpha = tflow_res$alpha,
     a = tflow_res$a,
-    b = tflow_res$b,
-    psi = tflow_res$psi,
-    W = tflow_res$W
+    b = tflow_res$b
   )
 
-  if('beta' %in% names(rlist)) ml_params$beta <- rlist$beta
+  if("psi" %in% names(tflow_res)) {
+    ml_params$psi <- tflow_res$psi
+    ml_params$W <- tflow_res$W
+    ml_params$chi <- tflow_res$chi
+  }
+
+  if("beta" %in% names(tflow_res)) {
+    ml_params$beta <- tflow_res$beta
+  }
 
   rlist$ml_params <- ml_params
   rlist$log_lik <- tflow_res$log_lik
@@ -413,7 +420,6 @@ evaluate_clonealign <- function(gene_expression_data,
 
   tbl <- table(ca$clone, clonealign_fit$clone)
 
-  # plot(tbl, main = 'Agreement between original (rows) and reduced (columns)')
 
   cat("Agreement between original (rows) and reduced (columns):")
   print(tbl)
