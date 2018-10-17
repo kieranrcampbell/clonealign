@@ -8,7 +8,7 @@ author:
     - Department of Molecular Oncology, BC Cancer Agency
     - UBC Data Science Institute, University of British Columbia
   email: kicampbell@bccrc.ca
-date: "April 2018"
+date: "October 2018"
 package: clonealign
 bibliography: bibliography.bib
 output: 
@@ -49,13 +49,13 @@ This is demonstrated in the figure below.
 
 Mathematically we have an $N \times G$ matrix $Y$ of raw gene expression counts (from RNA-seq) for $N$ cells and $G$ genes, where $y_{ng}$ is the counts to gene $g$ in cell $c$. We also have a $G \times C$ matrix $\Lambda$ of copy number variation for $C$ clones, where $\lambda_{gc}$ is the copy number of gene $g$ in clone $c$. We introduce a clone-assigning categorical variable $\pi_n$ for each cell, where
 
-$$ \pi_n = c \text{ if cell $n$ on clone $c$} $$
+$$z_n = c \text{ if cell $n$ on clone $c$} $$
 
 then `clonealign` models the conditional expected counts in a gene and cell as
 
-$$ E[y_{ng} | \pi_n=c] = \frac{\lambda_{g,c} f(\mu_g) e^{\psi_n \cdot w_g}}{ \sum_{g'}\lambda_{g',c} f(\mu_{g'}) e^{\psi_n \cdot w_{g'}}} s_n  $$
+$$ E[y_{ng} | z_n=c] = \frac{\lambda_{g,c} f(\mu_g) e^{\psi_n \cdot w_g}}{ \sum_{g'}\lambda_{g',c} f(\mu_{g'}) e^{\psi_n \cdot w_{g'}}} s_n  $$
 
-where $s_n$ is a cell-specific size factor, $\mu_g$ is the per-chromosome expression (normalized so that $\mu_1 = 1$ for model identifiability), $f$ is a function that maps copy number to a multiplicative factor of expression, and $\psi$ and $w$ are cell and gene specific random effects. The noise distribution is assumed to be negative-binomial. Inference is performed using expectation-maximization to find maximum likelihood estimates of the clone assignments $\pi_n$ and of all other model parameters.
+where $s_n$ is a cell-specific size factor, $\mu_g$ is the per-chromosome expression (normalized so that $\mu_1 = 1$ for model identifiability), $f$ is a function that maps copy number to a multiplicative factor of expression, and $\psi$ and $w$ are cell and gene specific random effects. The noise distribution is assumed to be negative-binomial. Inference is performed using reparametrization-gradient variational inference to calculate a posterior distribution of the clone assignments $z_n$ and of all other model parameters.
 
 # Installation
 
@@ -120,7 +120,7 @@ head(cnv_data)
 
 ## Model fitting
 
-The model is fitted with a basic call to `clonealign`, which prints the (relative change in) log-likelihood for each iteration (this can be turned off by setting `verbose = FALSE`):
+The model is fitted with a basic call to `clonealign`, which prints the ELBO for each iteration (this can be turned off by setting `verbose = FALSE`):
 
 ```{r}
 cal <- clonealign(example_sce, cnv_data)
@@ -130,11 +130,11 @@ cal <- clonealign(example_sce, cnv_data)
 print(cal)
 ```
 
-We can plot the marginal likelihood values to ensure convergence:
+We can plot the ELBO to ensure convergence:
 
 ```{r}
-qplot(seq_along(cal$log_lik), cal$log_lik, geom = c("point", "line")) +
-  labs(x = "Iteration", y = "Log-marginal-likelihood")
+qplot(seq_along(cal$elbo), cal$elbo, geom = c("point", "line")) +
+  labs(x = "Iteration", y = "ELBO")
 ```
 
 The maximum likelihood estimates of the clone assignments can be access through the `clone` slot:
@@ -199,7 +199,7 @@ where the `*_str` identifies the columns of `rowData(example_sce)` to look for t
 
 We perform his out-of-sample evaluation using the `evaluate_clonealign` function, which takes in the clonealign fit on the full dataset (along with the dataset) and both prints various metrics and returns a list containing various computed objects:
 
-```{r}
+```{r, eval = FALSE}
 ec <- evaluate_clonealign(example_sce, cnv_data, cal)
 ```
 
@@ -219,24 +219,23 @@ These metrics are stored in a list returned by the function call. For details, s
 # Advanced options
 
 
-## Controlling the EM algorithm
+## Controlling Variational Inference
 
-Inference is performed using the [EM algorithm](https://en.wikipedia.org/wiki/Expectation-maximization_algorithm)
-which uses the log marginal likelihood to monitor convergence. This is controlled using the
-`rel_tol_em` parameter. When the difference 
+Inference is performed using reparametrization gradient variational inference
+which uses the evidence lower bound (ELBO) to monitor convergence. This is controlled using the
+`rel_tol` parameter. When the difference 
 
-$$ \Delta L = \frac{L_{\text{new}} - L_{\text{old}}}{|L_{\text{old}}|} $$
-falls below `rel_tol_em`, the EM algorithm is considered converged. The maximum number of iterations to acheive this is set using the `max_iter_em` parameter.
+$$ \Delta ELBO = \frac{ELBO_{\text{new}} - ELBO_{\text{old}}}{|ELBO_{\text{old}}|} $$
+falls below `rel_tol`, the optimization algorithm is considered converged. The maximum number of iterations to acheive this is set using the `max_iter` parameter.
 
-The M-step uses Adam optimization (@kingma2014adam) which is controlled by three parameters:
+Inference is performed using Adam  (@kingma2014adam) which is controlled by three parameters:
 
 * `learning_rate` the learning rate
-* `rel_tol_adam` the relative difference in the $Q$-function value below which the M-step will be considered converged
-* `max_iter_adam` the maximum number of Adam iterations to perform at each M-step
+* `rel_tol` the relative difference in the ELBO below which the optimization will be considered converged (see above)
+* `max_iter` the maximum number of Adam iterations to perform (see above)
 
-Note that if the parameter values are close to the stationary point the marginal log-likelihood may decrease if the optimization step size doesn't decrease fast enough. This will generally lead to valid results, but decreasing the `learning_rate` parameter may help.
 
-## Accessing maximum-likelihood parameter estimates
+## Accessing posterior / maximum-likelihood parameter estimates
 
 The object returned by a call to `clonealign` contains a `clone` slot for the maximum likelihood (ML) clone assignment for each cell. The ML estimates of the other parameters can be found in the `cal$ml_params` slot:
 

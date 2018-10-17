@@ -4,11 +4,11 @@
 \alias{clonealign}
 \title{Assign scRNA-seq to clone-of-origin}
 \usage{
-clonealign(gene_expression_data, copy_number_data, max_iter_em = 100,
-  max_iter_adam = 1, rel_tol_em = 1e-06, rel_tol_adam = 1e-06,
-  gene_filter_threshold = 0, learning_rate = 0.1, x = NULL,
-  fix_alpha = FALSE, fix_s = NULL, dtype = "float64", saturate = TRUE,
-  saturation_threshold = 4, K = NULL, B = 20, verbose = TRUE)
+clonealign(gene_expression_data, copy_number_data, max_iter = 100,
+  rel_tol = 1e-06, gene_filter_threshold = 0, learning_rate = 0.1,
+  x = NULL, fix_alpha = FALSE, fix_s = NULL, dtype = "float64",
+  saturate = TRUE, saturation_threshold = 6, K = NULL, B = 20,
+  verbose = TRUE)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -17,15 +17,10 @@ clonealign(gene_expression_data, copy_number_data, max_iter_em = 100,
 \item{copy_number_data}{A matrix or data frame of copy number calls for each clone.
 See \code{details}.}
 
-\item{max_iter_em}{Maximum number of EM iterations to perform}
+\item{max_iter}{Maximum number of Variational Bayes iterations to perform}
 
-\item{max_iter_adam}{The maximum number of Adam iterations to perform in each M-step}
-
-\item{rel_tol_em}{Relative tolerance (change in log-likelihood per EM iteration in percent) below which the
-EM algorithm is considered converged}
-
-\item{rel_tol_adam}{The relative tolerance for each Adam update in the M-step below which the
-maximization will be considered converged}
+\item{rel_tol}{Relative tolerance (change in ELBO per iteration in percent) below which the
+inference is considered converged}
 
 \item{gene_filter_threshold}{Genes with total counts below or equal to this threshold will
 be filtered out (removes genes with no counts by default)}
@@ -48,7 +43,7 @@ a vector corresponding to the number of cells should be specified.}
 \item{saturation_threshold}{If \code{saturate} is true, copy numbers above this will be reduced to the threshold}
 
 \item{K}{The dimensionality of the expression latent space. If left \code{NULL}, K is set to 1 if fewer than 100 genes
-are present and 4 otherwise.}
+are present and 6 otherwise.}
 
 \item{B}{Number of basis functions for spline fitting}
 
@@ -92,17 +87,15 @@ to clonealign by the edgeR (TMM) normalization factors}
 }
 
 
-\strong{Controlling the EM algorithm}
+\strong{Controlling Variational inference}
 
-Inference is performed using the EM algorithm (\url{https://en.wikipedia.org/wiki/Expectation-maximization_algorithm})
-which uses the log marginal likelihood to monitor convergence. This is controlled using the
-\code{rel_tol_em} parameter. When the difference between the new and old log marginal likelihoods normalized
-by the absolute value of the old falls below \code{rel_tol_em}, the EM algorithm is considered converged.
-The maximum number of iterations to acheive this is set using the \code{max_iter_em} parameter.
+Inference is performed using reparametrization-gradient variational inference. Convergence is monitored via changes
+to the evidence lower bound (ELBO) - this is controlled using the
+\code{rel_tol} parameter. When the difference between the new and old ELBOs normalized
+by the absolute value of the old falls below \code{rel_tol}, the  algorithm is considered converged.
+The maximum number of iterations to acheive this is set using the \code{max_iter} parameter.
 
-In each M-step, maximization is performed using Adam, with learning rate given by \code{learning_rate}. Each M-step
-is considered converged with the value of the Q function falls below \code{rel_tol_adam} with a maximum number of iterations
-\code{max_iter_adam}.
+In each step, maximization is performed using Adam, with learning rate given by \code{learning_rate}.
 }
 \examples{
 library(SingleCellExperiment)

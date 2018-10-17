@@ -10,7 +10,7 @@ test_that("clonealign(...) returns a valid object", {
 
   L <- rowData(example_sce)[, c("A", "B", "C")]
 
-  cal <- clonealign(example_sce, L, max_iter_em = 5)
+  cal <- clonealign(example_sce, L, max_iter = 5)
 
   expect_is(cal, "clonealign_fit")
 

@@ -9,12 +9,9 @@
 #' \code{SingleCellExperiment}. This should contain raw counts. See \code{details}.
 #' @param copy_number_data A matrix or data frame of copy number calls for each clone.
 #' See \code{details}.
-#' @param rel_tol_em Relative tolerance (change in log-likelihood per EM iteration in percent) below which the
-#' EM algorithm is considered converged
-#' @param max_iter_em Maximum number of EM iterations to perform
-#' @param rel_tol_adam The relative tolerance for each Adam update in the M-step below which the
-#' maximization will be considered converged
-#' @param max_iter_adam The maximum number of Adam iterations to perform in each M-step
+#' @param rel_tol Relative tolerance (change in ELBO per iteration in percent) below which the
+#' inference is considered converged
+#' @param max_iter Maximum number of Variational Bayes iterations to perform
 #' @param gene_filter_threshold Genes with total counts below or equal to this threshold will
 #' be filtered out (removes genes with no counts by default)
 #' @param learning_rate The learning rate to be passed to the Adam optimizer
@@ -62,17 +59,15 @@
 #' }
 #'
 #'
-#' \strong{Controlling the EM algorithm}
+#' \strong{Controlling Variational inference}
 #'
-#' Inference is performed using the EM algorithm (\url{https://en.wikipedia.org/wiki/Expectation-maximization_algorithm})
-#' which uses the log marginal likelihood to monitor convergence. This is controlled using the
-#' \code{rel_tol_em} parameter. When the difference between the new and old log marginal likelihoods normalized
-#' by the absolute value of the old falls below \code{rel_tol_em}, the EM algorithm is considered converged.
-#' The maximum number of iterations to acheive this is set using the \code{max_iter_em} parameter.
+#' Inference is performed using reparametrization-gradient variational inference. Convergence is monitored via changes
+#' to the evidence lower bound (ELBO) - this is controlled using the
+#' \code{rel_tol} parameter. When the difference between the new and old ELBOs normalized
+#' by the absolute value of the old falls below \code{rel_tol}, the  algorithm is considered converged.
+#' The maximum number of iterations to acheive this is set using the \code{max_iter} parameter.
 #'
-#' In each M-step, maximization is performed using Adam, with learning rate given by \code{learning_rate}. Each M-step
-#' is considered converged with the value of the Q function falls below \code{rel_tol_adam} with a maximum number of iterations
-#' \code{max_iter_adam}.
+#' In each step, maximization is performed using Adam, with learning rate given by \code{learning_rate}.
 #'
 #' @return An object of class \code{clonealign_fit}. The maximum likelihood estimates of the
 #' clone assignment paramters are in the \code{clone} slot. Maximum likelihood estimates of
@@ -92,10 +87,8 @@
 #' clones <- cal$clone
 clonealign <- function(gene_expression_data,
                        copy_number_data,
-                       max_iter_em = 100,
-                       max_iter_adam = 1,
-                       rel_tol_em = 1e-6,
-                       rel_tol_adam = 1e-6,
+                       max_iter = 100,
+                       rel_tol = 1e-6,
                        gene_filter_threshold = 0,
                        learning_rate = 0.1,
                        x = NULL,
@@ -103,9 +96,9 @@ clonealign <- function(gene_expression_data,
                        fix_s = NULL,
                        dtype = "float64",
                        saturate = TRUE,
-                       saturation_threshold = 5,
+                       saturation_threshold = 6,
                        K = NULL,
-                       B = 10,
+                       B = 20,
                        verbose = TRUE) {
 
   N <- NA # Number of cells
@@ -157,10 +150,8 @@ clonealign <- function(gene_expression_data,
   # Sanity checking done - time to call em algorithm
   tflow_res <- inference_tflow(Y,
                                L,
-                               max_iter_em = max_iter_em,
-                               max_iter_adam = max_iter_adam,
-                               rel_tol_em= rel_tol_em,
-                               rel_tol_adam = rel_tol_adam,
+                               max_iter = max_iter,
+                               rel_tol = rel_tol,
                                learning_rate = learning_rate,
                                gene_filter_threshold = gene_filter_threshold,
                                x = x,
@@ -198,7 +189,7 @@ clonealign <- function(gene_expression_data,
   }
 
   rlist$ml_params <- ml_params
-  rlist$log_lik <- tflow_res$log_lik
+  rlist$elbo <- tflow_res$elbo
   rlist$retained_genes <- tflow_res$retained_genes
   rlist$basis_means <- tflow_res$basis_means
 
