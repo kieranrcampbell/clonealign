@@ -335,9 +335,9 @@ saturate <- function(x, threshold = 4) {
 #' \item full_observed_mse - the observed mean square error using the full gene set
 #' \item full_null_mse - A vector of mean square error under the randomized (permuted) distribution
 #' \item reduced_clonealign_fit - a clonealign fit on only the reduced (train) set of genes
-#' \item heldout_inds - the indices of the genes held out (test set) for evaluating predictive performance
+#' \item heldout_genes - the names of the genes held out (test set) for evaluating predictive performance
 #' out-of-sample
-#' \item kept_inds - the indices of retained genes as part of the reduced (train) set
+#' \item kept_names - the names of retained genes as part of the reduced (train) set
 #' \item heldout_observed_mse - the observed mean square error on the heldout (test) set of genes
 #' \item heldout_null_mse - a vector of mean square errors under a null distribution of randomly permuting the clones
 #'
@@ -359,7 +359,7 @@ evaluate_clonealign <- function(gene_expression_data,
                     copy_number_data,
                     clonealign_fit,
                     prop_holdout = 0.2,
-                    n_samples = 100,
+                    n_samples = 2,
                     s = NULL,
                     ...) {
 
@@ -396,12 +396,9 @@ evaluate_clonealign <- function(gene_expression_data,
     stop("copy_number_data must have same number of genes (rows) as gene_expression_data")
   }
 
-  C <- ncol(L)
+  rownames(L) <- colnames(Y)
 
-  # Sort the size factors
-  if(is.null(s)) {
-    s <- colSums(Y)
-  }
+  C <- ncol(L)
 
   # Compute mse on full data set
   observed_mse <- compute_ca_fit_mse(clonealign_fit, Y, L)
@@ -415,13 +412,13 @@ evaluate_clonealign <- function(gene_expression_data,
   cat("\n")
 
   # Fix which indices we're going to hold out
-  all_inds <- seq_len(G)
-  heldout_inds <- sample(all_inds, round(prop_holdout * G))
-  kept_inds <- setdiff(all_inds, heldout_inds)
+  genes <- colnames(Y)
+  heldout_genes <- sample(genes, round(prop_holdout * G))
+  kept_genes <- setdiff(genes, heldout_genes)
 
   # Fit reduced clonealign model
   message("Fitting reduced clonealign model...")
-  ca <- clonealign(Y[, kept_inds], L[kept_inds,], verbose = FALSE, ...)
+  ca <- clonealign(Y[, kept_genes], L[kept_genes,], verbose = FALSE, ...)
 
   tbl <- table(ca$clone, clonealign_fit$clone)
 
@@ -430,8 +427,8 @@ evaluate_clonealign <- function(gene_expression_data,
   print(tbl)
 
   # Compute mse on held out:
-  observed_mse_ho <- compute_ca_fit_mse(ca, Y[, heldout_inds], L[heldout_inds,], model_mu = FALSE)
-  null_mse_ho <- replicate(n_samples, compute_ca_fit_mse(ca, Y[, heldout_inds], L[heldout_inds,], model_mu = FALSE, random_clones = TRUE))
+  observed_mse_ho <- compute_ca_fit_mse(ca, Y[, heldout_genes], L[heldout_genes,], model_mu = FALSE)
+  null_mse_ho <- replicate(n_samples, compute_ca_fit_mse(ca, Y[, heldout_genes], L[heldout_genes,], model_mu = FALSE, random_clones = TRUE))
 
   cat(glue("On the held-out dataset, the observed MSE was on average {mean(null_mse_ho) / observed_mse_ho} times smaller than under a null model"))
   cat(glue(" and smaller {100 * mean(observed_mse_ho < mean(null_mse_ho))}% of the time"))
@@ -442,8 +439,8 @@ evaluate_clonealign <- function(gene_expression_data,
     full_observed_mse = observed_mse,
     full_null_mse = null_mse,
     reduced_clonealign_fit = ca,
-    heldout_inds = heldout_inds,
-    kept_inds = kept_inds,
+    heldout_genes = heldout_genes,
+    kept_genes = kept_genes,
     heldout_observed_mse = observed_mse_ho,
     heldout_null_mse = null_mse_ho
   )
@@ -456,20 +453,24 @@ evaluate_clonealign <- function(gene_expression_data,
 #'
 #' @return The mean square error of the clonealign fit on the given expression data using
 #' the provided clones
-compute_ca_fit_mse <- function(fit, Y, L, model_mu = TRUE, random_clones = FALSE) {
+compute_ca_fit_mse <- function(fit, Y, L,
+                               model_mu = FALSE, random_clones = FALSE) {
+
   clones <- fit$clone
   if(random_clones) {
     distinct_clones <- unique(clones)
     clones <- sample(distinct_clones, nrow(Y), replace = TRUE)
   }
   predicted_expression <- L[,clones] # G by N
+  #
   if(model_mu) {
     mu <- as.vector(fit$ml_params$mu)
-    predicted_expression <- mu * predicted_expression[fit$retained_genes,]
+    predicted_expression <- mu * predicted_expression#[fit$retained_genes,]
   }
   normalizer <- rowSums(Y) / colSums(predicted_expression)
   predicted_expression <- t(predicted_expression) * normalizer
-  mse <- mean((predicted_expression - Y[, fit$retained_genes])^2)
+
+  mse <- mean((predicted_expression - Y)^2)
   mse
 }
 
