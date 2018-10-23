@@ -451,11 +451,11 @@ compute_ca_fit_mse <- function(fit, Y, L, model_mu = TRUE, random_clones = FALSE
   predicted_expression <- L[,clones] # G by N
   if(model_mu) {
     mu <- as.vector(fit$ml_params$mu)
-    prediced_expression <- mu * predicted_expression
+    predicted_expression <- mu * predicted_expression[em$retained_genes,]
   }
   normalizer <- rowSums(Y) / colSums(predicted_expression)
   predicted_expression <- t(predicted_expression) * normalizer
-  mse <- mean((predicted_expression - Y)^2)
+  mse <- mean((predicted_expression - Y[, em$retained_genes])^2)
   mse
 }
 
