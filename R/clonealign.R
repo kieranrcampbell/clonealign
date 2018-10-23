@@ -92,6 +92,9 @@ clonealign <- function(gene_expression_data,
                        gene_filter_threshold = 0,
                        learning_rate = 0.1,
                        x = NULL,
+                       clone_allele = NULL,
+                       cov = NULL,
+                       ref = NULL,
                        fix_alpha = FALSE,
                        fix_s = NULL,
                        dtype = "float64",
@@ -155,6 +158,9 @@ clonealign <- function(gene_expression_data,
                                learning_rate = learning_rate,
                                gene_filter_threshold = gene_filter_threshold,
                                x = x,
+                               clone_allele = clone_allele,
+                               cov = cov,
+                               ref = cov,
                                fix_alpha = fix_alpha,
                                fix_s = fix_s,
                                dtype = dtype,
@@ -193,6 +199,10 @@ clonealign <- function(gene_expression_data,
   rlist$retained_genes <- tflow_res$retained_genes
   rlist$basis_means <- tflow_res$basis_means
 
+  if("clone_probs_from_snv" %in% names(tflow_res)) {
+    rlist$clone_probs_from_snv <- tflow_res$clone_probs_from_snv
+  }
+
   # Finally map clone names back to fitted values
   clone_names <- colnames(L)
   if(!is.null(L)) {
@@ -200,6 +210,10 @@ clonealign <- function(gene_expression_data,
                                    from = seq_len(C),
                                    to = clone_names)
     colnames(rlist$ml_params$clone_probs) <- clone_names
+
+    if("clone_probs_from_snv" %in% names(rlist)) {
+      colnames(rlist$clone_probs_from_snv) <- clone_names
+    }
   }
 
   rlist
@@ -451,11 +465,11 @@ compute_ca_fit_mse <- function(fit, Y, L, model_mu = TRUE, random_clones = FALSE
   predicted_expression <- L[,clones] # G by N
   if(model_mu) {
     mu <- as.vector(fit$ml_params$mu)
-    predicted_expression <- mu * predicted_expression[em$retained_genes,]
+    predicted_expression <- mu * predicted_expression[fit$retained_genes,]
   }
   normalizer <- rowSums(Y) / colSums(predicted_expression)
   predicted_expression <- t(predicted_expression) * normalizer
-  mse <- mean((predicted_expression - Y[, em$retained_genes])^2)
+  mse <- mean((predicted_expression - Y[, fit$retained_genes])^2)
   mse
 }
 
