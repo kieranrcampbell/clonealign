@@ -37,6 +37,9 @@ inference_tflow <- function(Y_dat,
                             learning_rate = 0.1,
                             gene_filter_threshold = 0,
                             x = NULL,
+                            clone_allele = NULL,
+                            cov = NULL,
+                            ref = NULL,
                             fix_alpha = FALSE,
                             fix_s = NULL,
                             dtype = c("float32", "float64"),
@@ -121,6 +124,28 @@ inference_tflow <- function(Y_dat,
     message("Creating Tensorflow graph...")
   }
 
+  # Allelic imbalance setup ----------
+  use_allele <- !is.null(clone_allele) && !is.null(ref) && !is.null(cov)
+  v_log_prob <- NULL
+  if(verbose && use_allele) {
+    message("Using allelic imbalance info")
+  }
+
+  if(use_allele) { # Use allele-specific info
+    V <- nrow(clone_allele) # Number of variants
+    sanitize_allele_info(V, clone_allele, cov, ref, N, C)
+
+    cov <- t(cov) # Legacy
+    ref <- t(ref)
+
+    alt <- cov - ref
+
+    clone_allele_ph <- tf$placeholder(shape = shape(V,C), dtype = dtype)
+    alt_ph <- tf$placeholder(shape = shape(V,N), dtype = dtype)
+    cov_ph <- tf$placeholder(shape = shape(V,N), dtype = dtype)
+
+    v_log_prob <- construct_ai_likelihood(clone_allele_ph, alt_ph, cov_ph, dtype, C, N)
+  }
 
   # Data specification ----------
   Y <- tf$placeholder(shape = shape(N,G), dtype = dtype)
@@ -231,6 +256,10 @@ inference_tflow <- function(Y_dat,
   # (i) E_q[log p(y | z, theta)]
   p_y_on_c <- tf$reduce_sum(y_log_prob, 3L) # Reduce over genes
 
+  if(use_allele) {
+    p_y_on_c <- p_y_on_c + tf$transpose(v_log_prob)
+  }
+
   E_p_y_on_c <- tf$reduce_mean(p_y_on_c, 0L) # Reduce over MC samples
 
   EE_p_y <- tf$reduce_sum(gamma * tf$transpose(E_p_y_on_c)) # E_q[p(y | theta)] (reduce over cells and clones)
@@ -285,11 +314,16 @@ inference_tflow <- function(Y_dat,
   init <- tf$global_variables_initializer()
   sess$run(init)
 
-  fd <- NULL
-  if(P == 0) {
-    fd <- dict(Y = Y_dat, L = L_dat)
-  } else {
-    fd <- dict(Y = Y_dat, L = L_dat, X = x)
+  fd <- dict(Y = Y_dat, L = L_dat)
+
+  if(P > 0) {
+    fd$update(dict(X = x))
+  }
+
+  if(use_allele) {
+    fd$update(dict(clone_allele_ph = clone_allele))
+    fd$update(dict(alt_ph = alt))
+    fd$update(dict(cov_ph = cov))
   }
 
   # Initialize gamma correctly
@@ -344,6 +378,12 @@ inference_tflow <- function(Y_dat,
     rlist$chi <- k_params[[3]]
   }
 
+  clone_probs_from_snv <- NULL
+  if(use_allele) {
+    clone_probs_from_snv <- tf$exp(tf$transpose(v_log_prob) - tf$reduce_logsumexp(v_log_prob, 1L))
+    clone_probs_from_snv <- t(sess$run(clone_probs_from_snv, feed_dict = fd))
+  }
+
   # Close the session ----------
   sess$close()
 
@@ -364,6 +404,7 @@ inference_tflow <- function(Y_dat,
 
   rlist$retained_genes <- retained_genes
   rlist$basis_means <- basis_means_fixed
+  rlist$clone_probs_from_snv <- clone_probs_from_snv
 
   return(rlist)
 }
