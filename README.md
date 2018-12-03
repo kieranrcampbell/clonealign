@@ -1,6 +1,6 @@
 # clonealign
 
-[![Build Status](https://travis-ci.org/kieranrcampbell/clonealign.svg?branch=master)](https://travis-ci.org/kieranrcampbell/clonealign)
+[![Build Status](https://travis-ci.org/kieranrcampbell/clonealign.svg?branch=master)](https://travis-ci.org/kieranrcampbell/clonealign) [![DOI](https://zenodo.org/badge/111455172.svg)](https://zenodo.org/badge/latestdoi/111455172)
 
 `clonealign` assigns single-cell RNA-seq expression to cancer clones by probabilistically mapping RNA-seq to clone-specific copy number profiles using [reparametrization gradient variational inference](https://arxiv.org/abs/1312.6114). This is particularly useful when clones have been inferred using ultra-shallow single-cell DNA-seq meaning SNV analysis is not possible.
 
