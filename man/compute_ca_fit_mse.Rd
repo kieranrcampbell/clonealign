@@ -4,7 +4,7 @@
 \alias{compute_ca_fit_mse}
 \title{Compute mean squared error of a clonealign fit}
 \usage{
-compute_ca_fit_mse(fit, Y, L, model_mu = TRUE, random_clones = FALSE)
+compute_ca_fit_mse(fit, Y, L, model_mu = FALSE, random_clones = FALSE)
 }
 \value{
 The mean square error of the clonealign fit on the given expression data using

@@ -6,7 +6,8 @@
 \usage{
 clonealign(gene_expression_data, copy_number_data, max_iter = 100,
   rel_tol = 1e-06, gene_filter_threshold = 0, learning_rate = 0.1,
-  x = NULL, fix_alpha = FALSE, fix_s = NULL, dtype = "float64",
+  x = NULL, clone_allele = NULL, cov = NULL, ref = NULL,
+  fix_alpha = FALSE, fix_s = NULL, dtype = "float64",
   saturate = TRUE, saturation_threshold = 6, K = NULL, B = 20,
   verbose = TRUE)
 }

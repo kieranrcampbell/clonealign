@@ -18,7 +18,7 @@ See the [website](https://kieranrcampbell.github.io/clonealign) for more details
 
 ```r
 install.packages("tensorflow")
-tensorflow::install_tensorflow()
+tensorflow::install_tensorflow(extra_packages = "tensorflow-probability")
 ```
 
 `clonealign` can then be installed from github:

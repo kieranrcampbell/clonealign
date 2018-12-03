@@ -63,8 +63,9 @@ inference_tflow <- function(Y_dat,
   tf$reset_default_graph()
 
   # Get distributions
-  tfd <- tf$contrib$distributions
-  tfb <- tf$contrib$distributions$bijectors
+  tfp <- reticulate::import("tensorflow_probability")
+  tfd <- tfp$distributions
+  tfb <- tfp$bijectors
 
   # Sort out the dtype
   dtype <- match.arg(dtype)

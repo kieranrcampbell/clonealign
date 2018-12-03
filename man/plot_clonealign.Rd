@@ -4,9 +4,10 @@
 \alias{plot_clonealign}
 \title{Plot gene expression and copy number}
 \usage{
-plot_clonealign(sce, clones, cnv_data, chromosome = "1", chr_str = "chr",
-  start_str = "start_position", end_str = "end_position",
-  jitter_cnv = TRUE, ggplot_palette = "Set1")
+plot_clonealign(sce, clones, cnv_data, chromosome = "1",
+  chr_str = "chr", start_str = "start_position",
+  end_str = "end_position", jitter_cnv = TRUE,
+  ggplot_palette = "Set1")
 }
 \arguments{
 \item{sce}{A \code{SingleCellExperiment}. Note this must have the fields
@@ -67,7 +68,7 @@ mutate(gene = seq_len(nrow(cnv_data))) \%>\%
 rowData(example_sce)$chromosome <- "1"
 rowData(example_sce)$start_pos <- gene_position
 rowData(example_sce)$end_pos <- gene_position
-example_sce <- normalise(example_sce)
+example_sce <- normalize(example_sce)
 plot_clonealign(example_sce, example_clonealign_fit$clone, cnv_data,
 chromosome = "1",
 chr_str = "chromosome",

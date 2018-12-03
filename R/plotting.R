@@ -1,15 +1,5 @@
 
 
-
-
-# sce <- sce_cnv_no_X_use
-# sce <- getBMFeatureAnnos(sce, filters = "ensembl_gene_id",
-#                          attributes = c("ensembl_gene_id", "start_position", "end_position"),
-#                          feature_symbol = "hgnc_symbol",
-#                          feature_id = "ensembl_gene_id",
-#                          dataset = "hsapiens_gene_ensembl")
-# L <- as.matrix(rowData(sce)[, c("A", "B", "C")])
-
 #' Plot gene expression and copy number
 #'
 #' Plot gene expression and copy number as a function of genomic coordinate.
@@ -68,7 +58,7 @@
 #' rowData(example_sce)$chromosome <- "1"
 #' rowData(example_sce)$start_pos <- gene_position
 #' rowData(example_sce)$end_pos <- gene_position
-#' example_sce <- normalise(example_sce)
+#' example_sce <- normalize(example_sce)
 #' plot_clonealign(example_sce, example_clonealign_fit$clone, cnv_data,
 #' chromosome = "1",
 #' chr_str = "chromosome",

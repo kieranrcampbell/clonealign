@@ -5,7 +5,7 @@
 \title{Evaluate the quality of a clonealign fit}
 \usage{
 evaluate_clonealign(gene_expression_data, copy_number_data, clonealign_fit,
-  prop_holdout = 0.2, n_samples = 100, s = NULL, ...)
+  prop_holdout = 0.2, n_samples = 2, s = NULL, ...)
 }
 \arguments{
 \item{gene_expression_data}{Either a \code{SingleCellExperiment} or matrix of counts, same as input to \code{clonealign}}
@@ -62,9 +62,9 @@ Everything computed above is returned in a list object with the following entrie
 \item full_observed_mse - the observed mean square error using the full gene set
 \item full_null_mse - A vector of mean square error under the randomized (permuted) distribution
 \item reduced_clonealign_fit - a clonealign fit on only the reduced (train) set of genes
-\item heldout_inds - the indices of the genes held out (test set) for evaluating predictive performance
+\item heldout_genes - the names of the genes held out (test set) for evaluating predictive performance
 out-of-sample
-\item kept_inds - the indices of retained genes as part of the reduced (train) set
+\item kept_names - the names of retained genes as part of the reduced (train) set
 \item heldout_observed_mse - the observed mean square error on the heldout (test) set of genes
 \item heldout_null_mse - a vector of mean square errors under a null distribution of randomly permuting the clones
 
