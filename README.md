@@ -18,8 +18,10 @@ See the [website](https://kieranrcampbell.github.io/clonealign) for more details
 
 ```r
 install.packages("tensorflow")
-tensorflow::install_tensorflow(extra_packages = "tensorflow-probability")
+tensorflow::install_tensorflow(extra_packages ="tensorflow-probability", version="1.12.0")
 ```
+
+Note that `clonealign` uses the [Tensorflow probability](https://www.tensorflow.org/probability/) library, requiring `Tensorflow` version `>= 1.12.0`, which can be installed using the above.
 
 `clonealign` can then be installed from github:
 
