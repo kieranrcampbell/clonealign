@@ -41,7 +41,7 @@ inference_tflow <- function(Y_dat,
                             cov = NULL,
                             ref = NULL,
                             fix_alpha = FALSE,
-                            fix_s = NULL,
+                            size_factors = "fixed",
                             dtype = c("float32", "float64"),
                             saturate = TRUE,
                             saturation_threshold = 6,
@@ -167,7 +167,7 @@ inference_tflow <- function(Y_dat,
   pcs <- pca$x[,seq_len(K),drop=FALSE]
   pcs <- scale(pcs)
 
-  s_init = rowSums(data$Y)
+  s_init <- rowSums(data$Y)
 
   mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
   mu_guess <- mu_guess[-1] / mu_guess[1]
@@ -192,11 +192,29 @@ inference_tflow <- function(Y_dat,
   }
 
   s <- NULL
-  if(!is.null(fix_s)) {
-    s <- tf$constant(s_init, dtype = dtype)
-  } else {
-    s <- tf$exp(tf$Variable(tf$constant(log(s_init), dtype = dtype))) + LOWER_BOUND
+
+  # Sort out size factors
+  if(length(size_factors == 1) && N > 1) {
+    if(!is.character(size_factors)) {
+      stop("If size factors does not contain sizes per cell it must be either 'fixed' or 'infer'. See ?clonealign")
+    }
+    if(!(size_factors %in% c("fixed", "infer"))) {
+      stop("Size factors must be either 'fixed' or 'infer'. See ?clonealign")
+    }
+
+    if(size_factors == "fixed") {
+      s <- tf$constant(s_init, dtype = dtype)
+    } else {
+      s <- tf$exp(tf$Variable(tf$constant(log(s_init), dtype = dtype))) + LOWER_BOUND
+    }
+
+  } else if(length(size_factors) > 1) {
+    if(length(size_factors) != N || !is.numeric(size_factors) || all(size_factors > 0)) {
+      stop("If size factors is not specified as 'fixed' or 'infer' a positive numeric vector of length N_cells must be supplied. See ?clonealign")
+    }
+    s <- tf$constant(size_factors, dtype = dtype)
   }
+
 
   log_alpha <- NULL
 

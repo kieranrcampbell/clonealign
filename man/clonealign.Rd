@@ -7,7 +7,7 @@
 clonealign(gene_expression_data, copy_number_data, max_iter = 100,
   rel_tol = 1e-06, gene_filter_threshold = 0, learning_rate = 0.1,
   x = NULL, clone_allele = NULL, cov = NULL, ref = NULL,
-  fix_alpha = FALSE, fix_s = NULL, dtype = "float64",
+  fix_alpha = FALSE, size_factors = "fixed", dtype = "float64",
   saturate = TRUE, saturation_threshold = 6, K = NULL, B = 20,
   verbose = TRUE)
 }
@@ -34,8 +34,7 @@ covariate or a sample by covariate matrix. Note this should not contain an inter
 \item{fix_alpha}{Should the underlying priors for clone frequencies be fixed? Default TRUE
 (values are inferred from the data)}
 
-\item{fix_s}{Should the size factors be fixed? If \code{NULL} they are jointly inferred from the data, otherwise
-a vector corresponding to the number of cells should be specified.}
+\item{size_factors}{Either "fixed", "infer", or a numeric vector of size factors. See \code{details}.}
 
 \item{dtype}{The dtype for tensorflow useage, either "float32" or "float64"}
 
@@ -70,6 +69,15 @@ representing raw gene expression counts, or a cell by gene matrix of raw counts.
 row for each gene in \code{gene_expression_data} and a column for each of the clones.
 If \code{colnames(copy_number_data)} is not \code{NULL} then these names will be used for each of
 the clones in the final output.
+
+
+\strong{Size factors}
+
+If \code{size_factors == "fixed"}, the size factors will be set to the overall library size per cell
+(total number of reads mapping to the cell).
+If \code{size_factors == "infer"}, the size factors will be treated as a model paramter and jointly
+optimized during inference.
+Otherwise, \code{size_factors} can be a numeric vector of precomputed, custom size factors.
 
 \strong{Recommended parameter settings}
 

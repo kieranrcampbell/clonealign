@@ -17,8 +17,6 @@
 #' @param learning_rate The learning rate to be passed to the Adam optimizer
 #' @param fix_alpha Should the underlying priors for clone frequencies be fixed? Default TRUE
 #' (values are inferred from the data)
-#' @param fix_s Should the size factors be fixed? If \code{NULL} they are jointly inferred from the data, otherwise
-#' a vector corresponding to the number of cells should be specified.
 #' @param dtype The dtype for tensorflow useage, either "float32" or "float64"
 #' @param saturate Should the CNV-expression relationship saturate above copy number = \code{saturation_threshold}? Default TRUE
 #' @param saturation_threshold If \code{saturate} is true, copy numbers above this will be reduced to the threshold
@@ -28,9 +26,11 @@
 #' @param K The dimensionality of the expression latent space. If left \code{NULL}, K is set to 1 if fewer than 100 genes
 #' are present and 6 otherwise.
 #' @param B Number of basis functions for spline fitting
+#' @param size_factors Either "fixed", "infer", or a numeric vector of size factors. See \code{details}.
 #'
 #'
 #' @details
+#'
 #' \strong{Input format}
 #'
 #' \code{gene_expression_data} must either be a \code{SingleCellExperiment} or \code{SummarizedExperiment}
@@ -41,6 +41,15 @@
 #' row for each gene in \code{gene_expression_data} and a column for each of the clones.
 #' If \code{colnames(copy_number_data)} is not \code{NULL} then these names will be used for each of
 #' the clones in the final output.
+#'
+#'
+#' \strong{Size factors}
+#'
+#' If \code{size_factors == "fixed"}, the size factors will be set to the overall library size per cell
+#' (total number of reads mapping to the cell).
+#' If \code{size_factors == "infer"}, the size factors will be treated as a model paramter and jointly
+#' optimized during inference.
+#' Otherwise, \code{size_factors} can be a numeric vector of precomputed, custom size factors.
 #'
 #' \strong{Recommended parameter settings}
 #'
@@ -96,7 +105,7 @@ clonealign <- function(gene_expression_data,
                        cov = NULL,
                        ref = NULL,
                        fix_alpha = FALSE,
-                       fix_s = NULL,
+                       size_factors = "fixed",
                        dtype = "float64",
                        saturate = TRUE,
                        saturation_threshold = 6,
@@ -162,7 +171,7 @@ clonealign <- function(gene_expression_data,
                                cov = cov,
                                ref = cov,
                                fix_alpha = fix_alpha,
-                               fix_s = fix_s,
+                               size_factors = "fixed",
                                dtype = dtype,
                                saturate = saturate,
                                saturation_threshold = saturation_threshold,

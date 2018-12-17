@@ -31,3 +31,25 @@ test_that("clonealign(...) returns a valid object", {
   expect_true(all(c("mu", "s", "a", "b") %in% names(cal$ml_params)))
 
 })
+
+
+
+test_that("clonealign(...) works with non-default size factors", {
+  data(example_sce)
+  library(SummarizedExperiment)
+  N <- ncol(example_sce)
+
+  L <- rowData(example_sce)[, c("A", "B", "C")]
+
+  cal <- clonealign(example_sce, L, max_iter = 5, size_factors = "infer")
+
+  expect_is(cal, "clonealign_fit")
+
+  sf <- colSums(counts(example_sce))
+
+  cal2 <- clonealign(example_sce, L, max_iter = 5, size_factors = sf)
+  expect_is(cal2, "clonealign_fit")
+
+
+})
+
