@@ -27,6 +27,8 @@
 #' are present and 6 otherwise.
 #' @param B Number of basis functions for spline fitting
 #' @param size_factors Either "fixed", "infer", or a numeric vector of size factors. See \code{details}.
+#' @param seed The random seed. See \code{details}.
+#'
 #'
 #'
 #' @details
@@ -78,6 +80,12 @@
 #'
 #' In each step, maximization is performed using Adam, with learning rate given by \code{learning_rate}.
 #'
+#' \strong{Random seed}
+#'
+#' The random seed can be set using the \code{seed} parameter. However, note that this disables GPU computation
+#' and parallelism. See \url{https://tensorflow.rstudio.com/tensorflow/reference/use_session_with_seed.html}
+#' for details.
+#'
 #' @return An object of class \code{clonealign_fit}. The maximum likelihood estimates of the
 #' clone assignment paramters are in the \code{clone} slot. Maximum likelihood estimates of
 #' all model parameters are in the \code{ml_params} slot.
@@ -111,7 +119,8 @@ clonealign <- function(gene_expression_data,
                        saturation_threshold = 6,
                        K = NULL,
                        B = 20,
-                       verbose = TRUE) {
+                       verbose = TRUE,
+                       seed = NULL) {
 
   N <- NA # Number of cells
   G <- NA # Number of genes
@@ -177,7 +186,8 @@ clonealign <- function(gene_expression_data,
                                saturation_threshold = saturation_threshold,
                                K = K,
                                B = B,
-                               verbose = verbose)
+                               verbose = verbose,
+                               seed = seed)
 
 
   rlist <- list(

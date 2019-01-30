@@ -9,7 +9,7 @@ clonealign(gene_expression_data, copy_number_data, max_iter = 100,
   x = NULL, clone_allele = NULL, cov = NULL, ref = NULL,
   fix_alpha = FALSE, size_factors = "fixed", dtype = "float64",
   saturate = TRUE, saturation_threshold = 6, K = NULL, B = 20,
-  verbose = TRUE)
+  verbose = TRUE, seed = NULL)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -48,6 +48,8 @@ are present and 6 otherwise.}
 \item{B}{Number of basis functions for spline fitting}
 
 \item{verbose}{Should warnings and EM convergence information be printed? Default TRUE}
+
+\item{seed}{The random seed. See \code{details}.}
 }
 \value{
 An object of class \code{clonealign_fit}. The maximum likelihood estimates of the
@@ -105,6 +107,12 @@ by the absolute value of the old falls below \code{rel_tol}, the  algorithm is c
 The maximum number of iterations to acheive this is set using the \code{max_iter} parameter.
 
 In each step, maximization is performed using Adam, with learning rate given by \code{learning_rate}.
+
+\strong{Random seed}
+
+The random seed can be set using the \code{seed} parameter. However, note that this disables GPU computation
+and parallelism. See \url{https://tensorflow.rstudio.com/tensorflow/reference/use_session_with_seed.html}
+for details.
 }
 \examples{
 library(SingleCellExperiment)

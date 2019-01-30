@@ -48,7 +48,8 @@ inference_tflow <- function(Y_dat,
                             K = 6,
                             B = 20,
                             mc_samples = 1,
-                            verbose = TRUE) {
+                            verbose = TRUE,
+                            seed = NULL) {
 
   # Do a first check that we actually have tensorflow support
   if(!reticulate::py_module_available("tensorflow")) {
@@ -59,13 +60,21 @@ inference_tflow <- function(Y_dat,
   }
 
 
-  # Reset graph
-  tf$reset_default_graph()
+
+
 
   # Get distributions
   tfp <- reticulate::import("tensorflow_probability")
   tfd <- tfp$distributions
   tfb <- tfp$bijectors
+
+  # Reset graph
+  tf$reset_default_graph()
+
+  if(!is.null(seed)) {
+    use_session_with_seed(seed)
+    ss <- tfd$SeedStream(seed, salt = 'qmu')
+  }
 
   # Sort out the dtype
   dtype <- match.arg(dtype)
@@ -236,7 +245,11 @@ inference_tflow <- function(Y_dat,
   )
 
   S <- as.integer(mc_samples)
-  mmu_samples <- qmu$sample(S)
+  if(!is.null(seed)) {
+    mmu_samples <- qmu$sample(S, seed = ss())
+  } else {
+    mmu_samples <- qmu$sample(S)
+  }
   mu_one_sample <- tf$ones(shape = shape(S, 1L), dtype = dtype)
   mu_samples <- tf$concat(list(mu_one_sample, mmu_samples), axis = 1L)
 
