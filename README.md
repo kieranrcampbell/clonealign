@@ -8,9 +8,12 @@
   <img src="https://raw.githubusercontent.com/kieranrcampbell/clonealign/master/inst/clonealign_figure.png"  align="middle"/>
 </div>
 
-See the [website](https://kieranrcampbell.github.io/clonealign) for more details as well as the [introductory vignette](https://kieranrcampbell.github.io/clonealign/articles/introduction_to_clonealign.html).
 
 ## Getting started
+
+### Vignettes
+
+1. [Introduction to clonealign](https://kieranrcampbell.github.io/clonealign/introduction_to_clonealign.html) Overview of `clonealign` including data preparation, model fitting, plotting results, and advanced inference control
 
 ### Installation
 
