@@ -23,7 +23,11 @@ Suggests:
   testthat,
   cowplot,
   tidyr,
-  SingleCellExperiment
+  SingleCellExperiment,
+  GenomicRanges,
+  matrixStats,
+  org.Hs.eg.db,
+  TxDb.Hsapiens.UCSC.hg19.knownGene
 biocViews:
   Software, 
   Transcriptomics, 

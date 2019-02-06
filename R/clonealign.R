@@ -275,6 +275,15 @@ print.clonealign_fit <- function(x, ...) {
 #' data(example_sce)
 "example_sce"
 
+#' Example raw copy number data
+#'
+#' An example data frame with copy number calls by
+#' region for three clones (A, B, C)
+#'
+#' @examples
+#' data(df_cnv)
+"df_cnv"
+
 
 #' Example clonealign_fit
 #'

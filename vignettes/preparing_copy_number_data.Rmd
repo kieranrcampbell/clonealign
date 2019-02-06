@@ -28,7 +28,8 @@ knitr::opts_chunk$set(
 
 suppressPackageStartupMessages({
   library(SummarizedExperiment)
-  library(tidyverse)
+  library(dplyr)
+  library(tidyr)
   library(clonealign)
   library(TxDb.Hsapiens.UCSC.hg19.knownGene)
   library(org.Hs.eg.db)
