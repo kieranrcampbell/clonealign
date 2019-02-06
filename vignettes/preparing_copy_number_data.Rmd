@@ -1,0 +1,194 @@
+---
+title: "Preparing copy number data for input to clonealign"
+shorttitle: "Preparing the gene level clone-specific copy number data for input to clonealign"
+author: 
+- name: "Kieran R Campbell"
+  affiliation: 
+    - Department of Statistics, University of British Columbia
+    - Department of Molecular Oncology, BC Cancer Agency
+    - UBC Data Science Institute, University of British Columbia
+  email: kicampbell@bccrc.ca
+date: "February 2019"
+# package: clonealign
+output: 
+  BiocStyle::html_document
+vignette: >
+  %\VignetteIndexEntry{Preparing copy number data}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}  
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  cache = FALSE
+)
+
+
+suppressPackageStartupMessages({
+  library(SummarizedExperiment)
+  library(tidyverse)
+  library(clonealign)
+  library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+  library(org.Hs.eg.db)
+  library(GenomicRanges)
+  library(matrixStats)
+})
+```
+
+
+# Overview
+
+This vignette outlines how to take clone specific copy number data at a region resolution (e.g. 500kb bins) and convert this to gene resolution as is required by `clonealign`. We leave this as a guide to be implemented separately rather than precomputed functions as there are several choices that are situation specific, such as choice of genome and chromosome naming (1,2,3 vs chr1,chr2,chr3).
+
+# Converting region-based copy number to gene based
+
+## Example dataset
+
+An example data frame containing clone and region specific data is included in the package:
+
+```{r}
+data(df_cnv)
+
+print(head(df_cnv))
+```
+
+This contains the following columns:
+
+1. `chr`: chromosome
+2. `start`, `end`: start and end positions on the chromosome
+3. `copy_number`: copy number of the segment
+4. `clone`: the clone for which this is the copy number
+
+## Loading the  gene database and making sure chromosome names match
+
+Next, we load the database of genes. In this example we choose the hg19 annotation, since our correspodning single-cell RNA-seq is aligned to hg19, and the copy number data (above) has been aligned to hg19. Thus we set
+
+```{r}
+txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
+```
+
+It is important we choose the correct genome here. For example, if instead we were working with mice and had aligned to mm9 then we would set
+
+```{r, eval = FALSE}
+txdb <- TxDb.Mmusculus.UCSC.mm9.knownGene
+```
+
+We can then load the corresponding gene annotations via
+
+```{r}
+g <- genes(txdb, single.strand.genes.only=FALSE)
+g
+```
+
+
+
+One issue that creates perennial worldwide angst is that our chromosome names are 1,2,3,... whereas those with gene annotation are chr1, chr2, chr3,... We fix this by changing our original data frame as follows:
+
+```{r}
+df_cnv <- mutate(df_cnv, chr = paste0("chr", chr))
+```
+
+We can then convert this to a `GRanges` object:
+
+```{r}
+cnv_gr <- makeGRangesFromDataFrame(df_cnv, keep.extra.columns = TRUE)
+cnv_gr
+```
+
+## Finding overlaps between gene and region based annotation
+
+Then we compute the overlaps between the gene annotation and the copy number data:
+
+```{r}
+olaps <- findOverlaps(g, cnv_gr)
+olaps
+```
+
+Here, the first column represents the index of each gene in `g` (that can be accessed with `queryHits(olaps)`), while the second column represents the index of each copy number region (`subjectHits(olaps)`). We can then convert this into a gene and copy number data frame:
+
+```{r}
+df_gene <- data_frame(entrezgene = names(g)[queryHits(olaps)], 
+           copy_number = mcols(cnv_gr)$copy_number[subjectHits(olaps)],
+           clone = mcols(cnv_gr)$clone[subjectHits(olaps)])
+```
+
+Next, we'd like to map on ensembl gene ids:
+
+
+```{r}
+entrezgene_ensembl_map <- as.list(org.Hs.egENSEMBL)
+entrezgene_ensembl_map <- lapply(entrezgene_ensembl_map, `[`, 1)
+
+df_gene <- dplyr::filter(df_gene, entrezgene %in% names(entrezgene_ensembl_map)) %>% 
+  dplyr::mutate(ensembl_gene_id = unlist(entrezgene_ensembl_map[entrezgene])) %>% 
+  dplyr::select(ensembl_gene_id, entrezgene, copy_number, clone) %>% 
+  drop_na()
+
+df_gene
+```
+
+We may find non-unique mappings. This can be due to genes spanning breakpoints or multi-mappings to e.g. pseudo-autosomal regions. To fix this, we retain only genes that are uniquely mapped:
+
+```{r}
+df_gene <- count(df_gene, ensembl_gene_id) %>% 
+  filter(n == length(unique(df_gene$clone))) %>% 
+  inner_join(df_gene) %>% 
+  dplyr::select(-n)
+```
+
+
+## Creating and filtering the input for clonealign
+
+Clonealign requires a gene by clone matrix as input, so to create this we'll use the `spread` function from `tidyr`:
+
+```{r}
+df_gene_expanded <- spread(df_gene, clone, copy_number)
+head(df_gene_expanded)
+```
+
+We can turn this into the required matrix:
+
+```{r}
+cnv_mat <- dplyr::select(df_gene_expanded, -ensembl_gene_id, -entrezgene) %>% 
+  as.matrix()
+
+rownames(cnv_mat) <- df_gene_expanded$ensembl_gene_id
+```
+
+In general, we should select as input to clonealign:
+
+1. Genes whose copy number varies between clones
+2. Genes whose minimum copy number is ~ 6 - this is arbitrary, but we expect dosage mechanisms to tail off somewhere in this region
+
+```{r}
+keep_gene <- rowMins(cnv_mat) <= 6 & rowVars(cnv_mat) > 0
+
+cnv_mat <- cnv_mat[keep_gene,]
+
+print(head(cnv_mat))
+```
+
+
+This is now ready for input to `clonealign`. If for example we had a `SingleCellExperiment` named `sce` as input with ensembl gene ids as the `rownames`, we would subset accordingly:
+
+```{r, eval = FALSE}
+sce <- sce[rownames(cnv_mat),]
+```
+
+and use these as input to clonealign:
+
+```{r, eval = FALSE}
+clonealign(sce, cnv_mat,...)
+```
+
+
+
+# Technical
+
+```{r}
+sessionInfo()
+```
+
+

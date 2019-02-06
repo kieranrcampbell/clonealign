@@ -14,6 +14,7 @@
 ### Vignettes
 
 1. [Introduction to clonealign](https://kieranrcampbell.github.io/clonealign/introduction_to_clonealign.html) Overview of `clonealign` including data preparation, model fitting, plotting results, and advanced inference control
+2. [Preparing copy number data for input to clonealign](https://kieranrcampbell.github.io/clonealign/preparing_copy_number_data.html) Instructions for taking region/range specific copy number profiles and converting them to gene and clone specific copy numbers for input to clonealign
 
 ### Installation
 
