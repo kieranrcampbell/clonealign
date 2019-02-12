@@ -30,6 +30,8 @@
 #' @param jitter_cnv Logical - if true random noise is added to the copy number profiles to help
 #' display all clones in case two lie on top of each other
 #' @param ggplot_palette The palette to be passed to \code{scale_colour_brewer}
+#' @param expression_ylim The y axis limits on the smoothed expression plot
+#' @param cnv_dodge_sd The standard deviation of the (0 mean) noise to add to the CNV plot
 #'
 #'
 #' @import ggplot2
@@ -70,7 +72,9 @@ plot_clonealign <- function(sce, clones, cnv_data, chromosome = "1",
                             start_str = "start_position",
                             end_str = "end_position",
                             jitter_cnv = TRUE,
-                            ggplot_palette = "Set1") {
+                            ggplot_palette = "Set1",
+                            expression_ylim = c(-.15, .15),
+                            cnv_dodge_sd = 0.1) {
 
   scaleFUN <- function(x) sprintf("%.1f", x)
 
@@ -156,7 +160,7 @@ plot_clonealign <- function(sce, clones, cnv_data, chromosome = "1",
     #dplyr::filter(length > 0)
 
   if(jitter_cnv) {
-    cnv_df_2$copy_number <- cnv_df_2$copy_number + rnorm(length(cnv_df_2$copy_number), 0, 0.05)
+    cnv_df_2$copy_number <- cnv_df_2$copy_number + rnorm(length(cnv_df_2$copy_number), 0, cnv_dodge_sd)
   }
 
   # And that's it for DNA
@@ -215,7 +219,7 @@ plot_clonealign <- function(sce, clones, cnv_data, chromosome = "1",
     geom_segment(data = df_seg,
                  aes(x = start-1, xend = end+1, y = per_clone_state_z_score, yend = per_clone_state_z_score),
                  size = 1.2) +
-    scale_y_continuous(labels=scaleFUN)
+    scale_y_continuous(labels=scaleFUN, limits = expression_ylim)
 
   cowplot::plot_grid(rna_plot, dna_plot, ncol = 1, align = 'v')
 

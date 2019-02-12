@@ -7,7 +7,8 @@
 plot_clonealign(sce, clones, cnv_data, chromosome = "1",
   chr_str = "chr", start_str = "start_position",
   end_str = "end_position", jitter_cnv = TRUE,
-  ggplot_palette = "Set1")
+  ggplot_palette = "Set1", expression_ylim = c(-0.15, 0.15),
+  cnv_dodge_sd = 0.1)
 }
 \arguments{
 \item{sce}{A \code{SingleCellExperiment}. Note this must have the fields
@@ -30,6 +31,10 @@ genes (rows) of this must match to the genes in \code{sce}}
 display all clones in case two lie on top of each other}
 
 \item{ggplot_palette}{The palette to be passed to \code{scale_colour_brewer}}
+
+\item{expression_ylim}{The y axis limits on the smoothed expression plot}
+
+\item{cnv_dodge_sd}{The standard deviation of the (0 mean) noise to add to the CNV plot}
 }
 \value{
 A ggplot2 object displaying a CNV and gene expression track for each (inferred) clone
