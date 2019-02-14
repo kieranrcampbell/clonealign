@@ -120,7 +120,8 @@ clonealign <- function(gene_expression_data,
                        K = NULL,
                        B = 20,
                        verbose = TRUE,
-                       seed = NULL) {
+                       seed = NULL,
+                       data_init_mu = TRUE) {
 
   N <- NA # Number of cells
   G <- NA # Number of genes
@@ -187,7 +188,8 @@ clonealign <- function(gene_expression_data,
                                K = K,
                                B = B,
                                verbose = verbose,
-                               seed = seed)
+                               seed = seed,
+                               data_init_mu = data_init_mu)
 
 
   rlist <- list(

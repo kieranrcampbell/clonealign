@@ -9,7 +9,7 @@ clonealign(gene_expression_data, copy_number_data, max_iter = 100,
   x = NULL, clone_allele = NULL, cov = NULL, ref = NULL,
   fix_alpha = FALSE, size_factors = "fixed", dtype = "float64",
   saturate = TRUE, saturation_threshold = 6, K = NULL, B = 20,
-  verbose = TRUE, seed = NULL)
+  verbose = TRUE, seed = NULL, data_init_mu = TRUE)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a

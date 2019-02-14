@@ -49,7 +49,8 @@ inference_tflow <- function(Y_dat,
                             B = 20,
                             mc_samples = 1,
                             verbose = TRUE,
-                            seed = NULL) {
+                            seed = NULL,
+                            data_init_mu = data_init_mu) {
 
   # Do a first check that we actually have tensorflow support
   if(!reticulate::py_module_available("tensorflow")) {
@@ -180,6 +181,10 @@ inference_tflow <- function(Y_dat,
 
   mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
   mu_guess <- mu_guess[-1] / mu_guess[1]
+  
+  if(!data_init_mu) {
+    mu_guess <- rep(1, length(mu_guess))
+  }
 
 
   # Tensors for dispersion basis functions ----------
