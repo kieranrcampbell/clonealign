@@ -59,7 +59,7 @@ print(head(cal$clone))
 
 ## Paper
 
-https://www.biorxiv.org/content/early/2018/06/11/344309
+[clonealign: statistical integration of independent single-cell RNA and DNA sequencing data from human cancers, _Genome Biology 2019_](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-019-1645-z)
 
 ## Authors
 
