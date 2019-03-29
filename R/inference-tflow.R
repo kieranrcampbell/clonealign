@@ -335,7 +335,7 @@ inference_tflow <- function(Y_dat,
 
   # Extra tensors required to initialize gamma
   p_y_on_c_ <- p_y_on_c
-  p_y_on_c_norm <- tf$reshape(tf$reduce_logsumexp(p_y_on_c, 1L), c(S, 1L, -1L))
+  p_y_on_c_norm <- tf$reshape(tf$reduce_logsumexp(p_y_on_c_, 1L), c(S, 1L, -1L))
   gamma_init <- tf$transpose(tf$reduce_mean(tf$exp(p_y_on_c - p_y_on_c_norm), 0L))
   gamma_init_ph <- tf$placeholder(shape = shape(N,C), dtype=dtype)
   init_gamma <- tf$assign(gamma_logits, tf$log(gamma_init_ph) )
