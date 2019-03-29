@@ -181,7 +181,7 @@ clonealign <- function(gene_expression_data,
                                cov = cov,
                                ref = cov,
                                fix_alpha = fix_alpha,
-                               size_factors = "fixed",
+                               size_factors = size_factors,
                                dtype = dtype,
                                saturate = saturate,
                                saturation_threshold = saturation_threshold,
@@ -526,8 +526,3 @@ plot_mean_dispersion <- function(em) {
   ggplot2::qplot(x, y, geom = 'line') +
     labs(x = expression(mu), y = expression(phi))
 }
-
-
-
-
-

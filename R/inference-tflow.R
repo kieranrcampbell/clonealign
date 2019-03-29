@@ -181,7 +181,7 @@ inference_tflow <- function(Y_dat,
 
   mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
   mu_guess <- mu_guess[-1] / mu_guess[1]
-  
+
   if(!data_init_mu) {
     mu_guess <- rep(1, length(mu_guess))
   }
@@ -208,7 +208,7 @@ inference_tflow <- function(Y_dat,
   s <- NULL
 
   # Sort out size factors
-  if(length(size_factors == 1) && N > 1) {
+  if(length(size_factors) == 1 && N > 1) {
     if(!is.character(size_factors)) {
       stop("If size factors does not contain sizes per cell it must be either 'fixed' or 'infer'. See ?clonealign")
     }
@@ -223,7 +223,7 @@ inference_tflow <- function(Y_dat,
     }
 
   } else if(length(size_factors) > 1) {
-    if(length(size_factors) != N || !is.numeric(size_factors) || all(size_factors > 0)) {
+    if(length(size_factors) != N || !is.numeric(size_factors) || !all(size_factors > 0)) {
       stop("If size factors is not specified as 'fixed' or 'infer' a positive numeric vector of length N_cells must be supplied. See ?clonealign")
     }
     s <- tf$constant(size_factors, dtype = dtype)
@@ -445,8 +445,3 @@ inference_tflow <- function(Y_dat,
 
   return(rlist)
 }
-
-
-
-
-
