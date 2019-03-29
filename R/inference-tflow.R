@@ -181,7 +181,7 @@ inference_tflow <- function(Y_dat,
 
   mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
   mu_guess <- mu_guess[-1] / mu_guess[1]
-  
+
   if(!data_init_mu) {
     mu_guess <- rep(1, length(mu_guess))
   }
@@ -208,7 +208,7 @@ inference_tflow <- function(Y_dat,
   s <- NULL
 
   # Sort out size factors
-  if(length(size_factors == 1) && N > 1) {
+  if(length(size_factors) == 1 && N > 1) {
     if(!is.character(size_factors)) {
       stop("If size factors does not contain sizes per cell it must be either 'fixed' or 'infer'. See ?clonealign")
     }
@@ -223,7 +223,7 @@ inference_tflow <- function(Y_dat,
     }
 
   } else if(length(size_factors) > 1) {
-    if(length(size_factors) != N || !is.numeric(size_factors) || all(size_factors > 0)) {
+    if(length(size_factors) != N || !is.numeric(size_factors) || !all(size_factors > 0)) {
       stop("If size factors is not specified as 'fixed' or 'infer' a positive numeric vector of length N_cells must be supplied. See ?clonealign")
     }
     s <- tf$constant(size_factors, dtype = dtype)
@@ -335,7 +335,7 @@ inference_tflow <- function(Y_dat,
 
   # Extra tensors required to initialize gamma
   p_y_on_c_ <- p_y_on_c
-  p_y_on_c_norm <- tf$reshape(tf$reduce_logsumexp(p_y_on_c_, 1L), c(S, 1L, -1L))
+  p_y_on_c_norm <- tf$reshape(tf$reduce_logsumexp(pQ_y_on_c_, 1L), c(S, 1L, -1L))
   gamma_init <- tf$transpose(tf$reduce_mean(tf$exp(p_y_on_c - p_y_on_c_norm), 0L))
   gamma_init_ph <- tf$placeholder(shape = shape(N,C), dtype=dtype)
   init_gamma <- tf$assign(gamma_logits, tf$log(gamma_init_ph) )
@@ -445,8 +445,3 @@ inference_tflow <- function(Y_dat,
 
   return(rlist)
 }
-
-
-
-
-
