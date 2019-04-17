@@ -8,7 +8,7 @@ author:
     - Department of Molecular Oncology, BC Cancer Agency
     - UBC Data Science Institute, University of British Columbia
   email: kicampbell@bccrc.ca
-date: "October 2018"
+date: "April 2019"
 package: clonealign
 bibliography: bibliography.bib
 output: 
@@ -56,7 +56,7 @@ then `clonealign` models the conditional expected counts in a gene and cell as
 
 $$ E[y_{ng} | z_n=c] = \frac{\lambda_{g,c} f(\mu_g) e^{\psi_n \cdot w_g}}{ \sum_{g'}\lambda_{g',c} f(\mu_{g'}) e^{\psi_n \cdot w_{g'}}} s_n  $$
 
-where $s_n$ is a cell-specific size factor, $\mu_g$ is the per-chromosome expression (normalized so that $\mu_1 = 1$ for model identifiability), $f$ is a function that maps copy number to a multiplicative factor of expression, and $\psi$ and $w$ are cell and gene specific random effects. The noise distribution is assumed to be negative-binomial. Inference is performed using reparametrization-gradient variational inference to calculate a posterior distribution of the clone assignments $z_n$ and of all other model parameters.
+where $s_n$ is a cell-specific size factor, $\mu_g$ is the per-chromosome expression (normalized so that $\mu_1 = 1$ for model identifiability), $f$ is a function that maps copy number to a multiplicative factor of expression, and $\psi$ and $w$ are cell and gene specific random effects. As of clonealign 2.0, the  noise distribution is assumed to be multinomial. Inference is performed using reparametrization-gradient variational inference to calculate a posterior distribution of the clone assignments $z_n$ and of all other model parameters.
 
 # Installation
 

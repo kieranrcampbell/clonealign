@@ -1,4 +1,60 @@
 
+#' Run clonealign across a range of initializations
+#' 
+#' Run \code{clonealign} across a range of initializations and select the fit 
+#' that acheives the best evidence lower bound (ELBO).
+#' 
+#' @param gene_expression_data A matrix of gene counts or a
+#' \code{SingleCellExperiment}. See \code{?clonealign}
+#' @param copy_number_data A matrix or data frame of copy number calls for each clone.
+#' See \code{?clonealign}.
+#' @param initial_shrinks Initial shrinkages for the clone assignment variational parameters
+#' @param print_elbos Logical - should the ELBOs inferred be printed?
+#' @param ... Additional arguments to pass to \code{clonealign(...)}
+#' 
+#' @details
+#' This function essentially wraps \code{clonealign} and can be interacted with as such. The
+#' parameter \code{initial_shrinks} controls how hard the variational parameters are initially
+#' assigned, analagous to the E-step in EM. At 0, they are initialized evenly across clones,
+#' while at 10 they are semi hard assigned to the most likely initial values.
+#' 
+#' 
+#' @export
+run_clonealign <- function(gene_expression_data,
+                          copy_number_data,
+                          initial_shrinks = c(0, 5, 10),
+                          n_repeats = 3,
+                          print_elbos = TRUE,
+                          ...) {
+  
+  args <- list(...)
+  args[['gene_expression_data']] <- gene_expression_data
+  args[['copy_number_data']] <- copy_number_data
+  
+  
+  fits <- lapply(initial_shrinks, function(is) {
+    args[['initial_shrink']] <- is
+    replicate(n_repeats, {
+      do.call(clonealign, args)
+    }, simplify = FALSE)
+  })
+  
+  fits <- unlist(fits, recursive = FALSE)
+  
+  final_elbos <- sapply(fits, function(ca) ca$final_elbo)
+  
+  if(print_elbos) {
+    message(paste("ELBOs: ", paste(final_elbos, collapse= " ")))
+  }
+  
+  fit_to_return <- fits[[ which.max(final_elbos) ]]
+  
+  fit_to_return$clone_prevalences_at_different_shrinks <- lapply(fits, function(ca) table(ca$clone))
+  
+  fit_to_return
+}
+
+
 #' Assign scRNA-seq to clone-of-origin
 #'
 #'
@@ -25,7 +81,8 @@
 #' covariate or a sample by covariate matrix. Note this should not contain an intercept.
 #' @param K The dimensionality of the expression latent space. If left \code{NULL}, K is set to 1 if fewer than 100 genes
 #' are present and 6 otherwise.
-#' @param B Number of basis functions for spline fitting
+#' @param initial_shrink The strength with which the variational parameters for clone assignments are
+#' initially shrunk towards the most likely assignments. See \code{?run_clonealign}.
 #' @param size_factors Either "fixed", "infer", or a numeric vector of size factors. See \code{details}.
 #' @param seed The random seed. See \code{details}.
 #'
@@ -104,7 +161,7 @@
 #' clones <- cal$clone
 clonealign <- function(gene_expression_data,
                        copy_number_data,
-                       max_iter = 100,
+                       max_iter = 200,
                        rel_tol = 1e-6,
                        gene_filter_threshold = 0,
                        learning_rate = 0.1,
@@ -113,15 +170,16 @@ clonealign <- function(gene_expression_data,
                        cov = NULL,
                        ref = NULL,
                        fix_alpha = FALSE,
-                       size_factors = "fixed",
                        dtype = "float64",
                        saturate = TRUE,
                        saturation_threshold = 6,
                        K = NULL,
-                       B = 20,
+                       mc_samples = 1,
                        verbose = TRUE,
                        seed = NULL,
+                       initial_shrink = 5,
                        data_init_mu = TRUE) {
+  
 
   N <- NA # Number of cells
   G <- NA # Number of genes
@@ -147,7 +205,7 @@ clonealign <- function(gene_expression_data,
     if(G <= 100) {
       K <- 1
     } else {
-      K <- 6
+      K <- 1
     }
   }
 
@@ -165,8 +223,13 @@ clonealign <- function(gene_expression_data,
   if(nrow(L) != G) {
     stop("copy_number_data must have same number of genes (rows) as gene_expression_data")
   }
+  
+
 
   C <- ncol(L)
+  if(is.null(colnames(L))) {
+    colnames(L) <- paste0("clone_", letters[seq_len(C)])
+  }
 
 
   # Sanity checking done - time to call em algorithm
@@ -181,15 +244,17 @@ clonealign <- function(gene_expression_data,
                                cov = cov,
                                ref = cov,
                                fix_alpha = fix_alpha,
-                               size_factors = size_factors,
                                dtype = dtype,
                                saturate = saturate,
                                saturation_threshold = saturation_threshold,
                                K = K,
-                               B = B,
+                               mc_samples = mc_samples,
                                verbose = verbose,
                                seed = seed,
+                               initial_shrink = initial_shrink,
                                data_init_mu = data_init_mu)
+  
+
 
 
   rlist <- list(
@@ -200,9 +265,7 @@ clonealign <- function(gene_expression_data,
     clone_probs = tflow_res$gamma,
     mu = tflow_res$mu,
     s = tflow_res$s,
-    alpha = tflow_res$alpha,
-    a = tflow_res$a,
-    b = tflow_res$b
+    alpha = tflow_res$alpha
   )
 
   if("psi" %in% names(tflow_res)) {
@@ -219,6 +282,9 @@ clonealign <- function(gene_expression_data,
   rlist$elbo <- tflow_res$elbo
   rlist$retained_genes <- tflow_res$retained_genes
   rlist$basis_means <- tflow_res$basis_means
+  
+  rlist$final_elbo <- tflow_res$final_elbo
+  rlist$sd_final_elbo <- tflow_res$sd_final_elbo
 
   if("clone_probs_from_snv" %in% names(tflow_res)) {
     rlist$clone_probs_from_snv <- tflow_res$clone_probs_from_snv
@@ -237,10 +303,18 @@ clonealign <- function(gene_expression_data,
     }
   }
 
-  rlist
+  rlist$correlations <- compute_correlations(Y, L, rlist$clone)
 
   structure(rlist, class = "clonealign_fit")
 
+}
+
+compute_correlations <- function(Y, L, clones) {
+  sapply(seq_len(ncol(Y)), function(i) {
+    y <- Y[,i]
+    x <- L[i, clones]
+    cor(x,y)
+  })
 }
 
 #' Print a clonealign_fit

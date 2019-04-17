@@ -8,8 +8,9 @@ clonealign(gene_expression_data, copy_number_data, max_iter = 100,
   rel_tol = 1e-06, gene_filter_threshold = 0, learning_rate = 0.1,
   x = NULL, clone_allele = NULL, cov = NULL, ref = NULL,
   fix_alpha = FALSE, size_factors = "fixed", dtype = "float64",
-  saturate = TRUE, saturation_threshold = 6, K = NULL, B = 20,
-  verbose = TRUE, seed = NULL, data_init_mu = TRUE)
+  saturate = TRUE, saturation_threshold = 6, K = NULL,
+  mc_samples = 1, verbose = TRUE, seed = NULL, initial_shrink = 5,
+  data_init_mu = TRUE)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -45,11 +46,12 @@ covariate or a sample by covariate matrix. Note this should not contain an inter
 \item{K}{The dimensionality of the expression latent space. If left \code{NULL}, K is set to 1 if fewer than 100 genes
 are present and 6 otherwise.}
 
-\item{B}{Number of basis functions for spline fitting}
-
 \item{verbose}{Should warnings and EM convergence information be printed? Default TRUE}
 
 \item{seed}{The random seed. See \code{details}.}
+
+\item{initial_shrink}{The strength with which the variational parameters for clone assignments are
+initially shrunk towards the most likely assignments. See \code{?run_clonealign}.}
 }
 \value{
 An object of class \code{clonealign_fit}. The maximum likelihood estimates of the

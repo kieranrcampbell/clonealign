@@ -1,6 +1,14 @@
 
 inverse_softplus <- function(x) {
-  exp(log(x) - 1)
+  log(exp(x) - 1)
+}
+
+safe_inverse_softplus <- function(x) {
+  log(1 - exp(-abs(x))) + pmax(x, 0)
+}
+
+softplus <- function(x) {
+  log(1 + exp(x))
 }
 
 #' Computes map clone assignment given EM object
@@ -41,14 +49,13 @@ inference_tflow <- function(Y_dat,
                             cov = NULL,
                             ref = NULL,
                             fix_alpha = FALSE,
-                            size_factors = "fixed",
                             dtype = c("float32", "float64"),
                             saturate = TRUE,
                             saturation_threshold = 6,
                             K = 6,
-                            B = 20,
                             mc_samples = 1,
                             verbose = TRUE,
+                            initial_shrink = 5,
                             seed = NULL,
                             data_init_mu = data_init_mu) {
 
@@ -61,13 +68,17 @@ inference_tflow <- function(Y_dat,
   }
 
 
-
+  random_init <- FALSE
 
 
   # Get distributions
   tfp <- reticulate::import("tensorflow_probability")
   tfd <- tfp$distributions
   tfb <- tfp$bijectors
+  
+  if(verbose) {
+    message("Constructing tensorflow graph")
+  }
 
   # Reset graph
   tf$reset_default_graph()
@@ -131,10 +142,6 @@ inference_tflow <- function(Y_dat,
   )
 
 
-  if(verbose) {
-    message("Creating Tensorflow graph...")
-  }
-
   # Allelic imbalance setup ----------
   use_allele <- !is.null(clone_allele) && !is.null(ref) && !is.null(cov)
   v_log_prob <- NULL
@@ -176,24 +183,28 @@ inference_tflow <- function(Y_dat,
   pca <- prcomp(log2(Y_dat+1), center = TRUE, scale = TRUE)
   pcs <- pca$x[,seq_len(K),drop=FALSE]
   pcs <- scale(pcs)
+  
+  pcs <- pcs + matrix(rnorm(nrow(pcs) * ncol(pcs), mean=0, sd = .05), nrow = nrow(pcs))
 
   s_init <- rowSums(data$Y)
 
   mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
   mu_guess <- mu_guess[-1] / mu_guess[1]
 
+  
+  beta_init <- matrix(0, nrow = G, ncol = P)
+  
+  if(random_init) {
+    beta_init <- matrix(rnorm(beta_init), nrow = G, ncol = P)
+  }
+  
   if(!data_init_mu) {
     mu_guess <- rep(1, length(mu_guess))
   }
-
-
-  # Tensors for dispersion basis functions ----------
-  B <- as.integer(B)
-  basis_means_fixed <- seq(from = min(Y_dat), to = max(Y_dat+1)/3, length.out = B)
-  basis_means <- tf$constant(basis_means_fixed, dtype = dtype)
-  b_init <- 2 * (basis_means_fixed[2] - basis_means_fixed[1])^2
-  a <- tf$exp(tf$Variable(tf$constant(rep(log(1), B), dtype = dtype)))
-  b <- tf$exp(tf$constant(rep(-log(b_init), B), dtype = dtype))
+  
+  if(random_init) {
+    mu_guess <- softplus(rnorm(length(mu_guess)))
+  }
 
   # Variables to be optimized ----------
   W <- tf$Variable(tf$zeros(shape = c(G, K), dtype = dtype))
@@ -201,64 +212,44 @@ inference_tflow <- function(Y_dat,
   psi <- tf$Variable(tf$constant(pcs, dtype = dtype))
   psi_times_W <- tf$matmul(psi, W, transpose_b = TRUE)
   if(P > 0) {
-    beta <- tf$get_variable("beta", initializer = tf$zeros(shape = shape(G,P), dtype = dtype))
+    beta <- tf$get_variable("beta", initializer = tf$constant(beta_init, dtype = dtype))
     X_times_beta = tf$matmul(X, beta, transpose_b = TRUE)
   }
 
-  s <- NULL
 
-  # Sort out size factors
-  if(length(size_factors) == 1 && N > 1) {
-    if(!is.character(size_factors)) {
-      stop("If size factors does not contain sizes per cell it must be either 'fixed' or 'infer'. See ?clonealign")
-    }
-    if(!(size_factors %in% c("fixed", "infer"))) {
-      stop("Size factors must be either 'fixed' or 'infer'. See ?clonealign")
-    }
-
-    if(size_factors == "fixed") {
-      s <- tf$constant(s_init, dtype = dtype)
-    } else {
-      s <- tf$exp(tf$Variable(tf$constant(log(s_init), dtype = dtype))) + LOWER_BOUND
-    }
-
-  } else if(length(size_factors) > 1) {
-    if(length(size_factors) != N || !is.numeric(size_factors) || !all(size_factors > 0)) {
-      stop("If size factors is not specified as 'fixed' or 'infer' a positive numeric vector of length N_cells must be supplied. See ?clonealign")
-    }
-    s <- tf$constant(size_factors, dtype = dtype)
-  }
-
+  s <- tf$constant(s_init, dtype = dtype)
 
   log_alpha <- NULL
 
-  if(!fix_alpha) {
-    alpha_unconstr <- tf$Variable(tf$zeros(C, dtype = dtype))
-    log_alpha <- tf$nn$log_softmax(alpha_unconstr)
-  } else {
-    log_alpha <- tf$constant(rep(-log(C), C), dtype = dtype)
-  }
+  alpha_unconstr <- tf$Variable(tf$zeros(C, dtype = dtype))
+  log_alpha <- tf$nn$log_softmax(alpha_unconstr)
 
   # Variational variables for mu and z ----------
-  sdinit <- 1e-1
+  sdinit <- .5
+  
   qmu <- tfd$TransformedDistribution(
     bijector = tfb$Softplus(),
-    distribution = tfd$Normal(loc = tf$Variable(tf$constant(inverse_softplus(mu_guess),dtype=dtype)),
+    distribution = tfd$Normal(loc = tf$Variable(tf$constant(safe_inverse_softplus(mu_guess),dtype=dtype)),
                               scale = tf$exp(tf$Variable(tf$constant(rep(log(sdinit), G-1), dtype = dtype)))),
 
     name = "qmu"
   )
 
-  S <- as.integer(mc_samples)
+  S <- tf$placeholder(dtype=tf$int32) #  as.integer(mc_samples)
   if(!is.null(seed)) {
     mmu_samples <- qmu$sample(S, seed = ss())
   } else {
     mmu_samples <- qmu$sample(S)
   }
-  mu_one_sample <- tf$ones(shape = shape(S, 1L), dtype = dtype)
+  
+  # mmu_samples is shaped S by (n_genes - 1)
+  
+  mu_one_sample <- tf$reshape(tf$ones(shape = S, dtype = dtype), c(-1L, 1L))
+  
+  # mu_samples is shped S by n_genes
   mu_samples <- tf$concat(list(mu_one_sample, mmu_samples), axis = 1L)
 
-  gamma_logits <- tf$Variable(tf$zeros(shape(N,C) , dtype = dtype))
+  gamma_logits <- tf$Variable(tf$zeros(shape(N,C) , dtype = dtype)) 
   gamma <- tf$nn$softmax(gamma_logits)
 
 
@@ -276,22 +267,17 @@ inference_tflow <- function(Y_dat,
 
   mu_scg <- tf$einsum('sg,gc->scg', mu_samples, L)
   mu_sgcn <- tf$einsum('scg,ng->sgcn', mu_scg, random_fixed_effects)
-  mu_scn_norm_fctr <- s * tf$ones(1, dtype=dtype) / ( tf$reduce_sum(mu_sgcn, 1L) )  # REMOVE ME!!! # S by C by N
+  mu_scn_norm_fctr <- tf$ones(1, dtype=dtype) / ( tf$reduce_sum(mu_sgcn, 1L) ) # 
   mu_sgcn_norm <- tf$einsum('sgcn,scn->sgcn', mu_sgcn, mu_scn_norm_fctr)
-  mu_sncg <- tf$transpose(mu_sgcn_norm, perm = c(0L, 3L, 2L, 1L))
-  mu_sncgb <- tf$tile(tf$expand_dims(mu_sncg, axis = 4L), c(1L, 1L, 1L, 1L, B))
-  phi_samples <- tf$reduce_sum(a * tf$exp(-b * tf$square(mu_sncgb - basis_means)), 4L) + LOWER_BOUND # s by n by c by g
-
-  p <- (mu_sncg) / (mu_sncg + phi_samples)
-  y_pdf <- tfd$NegativeBinomial(probs = tf$transpose(p, c(0L, 2L, 1L, 3L)), # S C N G
-                                total_count = tf$transpose(phi_samples, c(0L, 2L, 1L, 3L)))
-
-  y_log_prob <- y_pdf$log_prob(Y)
+  mu_scng <- tf$transpose(mu_sgcn_norm, perm = c(0L, 2L, 3L, 1L))
+  
+  y_pdf <- tfd$Multinomial(total_count = s_init, probs = mu_scng)
+  
+  p_y_on_c <- y_pdf$log_prob(Y)
 
   # Build ELBO ----------
 
   # (i) E_q[log p(y | z, theta)]
-  p_y_on_c <- tf$reduce_sum(y_log_prob, 3L) # Reduce over genes
 
   if(use_allele) {
     p_y_on_c <- p_y_on_c + tf$transpose(v_log_prob)
@@ -300,9 +286,6 @@ inference_tflow <- function(Y_dat,
   E_p_y_on_c <- tf$reduce_mean(p_y_on_c, 0L) # Reduce over MC samples
 
   EE_p_y <- tf$reduce_sum(gamma * tf$transpose(E_p_y_on_c)) # E_q[p(y | theta)] (reduce over cells and clones)
-  EE_p_y <- tf$reduce_mean(tf$einsum('nc,scn->s', gamma, p_y_on_c))
-
-
 
   # Prior on w, psi and chi
   if(K > 0) {
@@ -317,7 +300,7 @@ inference_tflow <- function(Y_dat,
   }
   # (ii) E_q[log p(theta)]
   E_log_p_p <- tf$reduce_sum(log_alpha * gamma) +
-    tf$reduce_sum(tfd$Normal(loc = tf$zeros(1, dtype = dtype), scale = tf$ones(1, dtype = dtype))$log_prob(tf$log(mmu_samples))) / tf$constant(S, dtype = dtype) +
+    tf$reduce_sum(tfd$Normal(loc = tf$zeros(1, dtype = dtype), scale = tf$ones(1, dtype = dtype))$log_prob(tf$log(mmu_samples))) / tf$to_float(S) +
     tf$reduce_sum(tfd$Dirichlet(tf$constant(rep(1, C), dtype = dtype))$log_prob(tf$exp(log_alpha)))
 
   if(K>0) {
@@ -327,18 +310,16 @@ inference_tflow <- function(Y_dat,
 
   # (iii) E_q[log q]
   E_log_q <- tf$reduce_sum(tf$reduce_mean(qmu$log_prob(mmu_samples), 0L)) +
-    # tf$reduce_sum(tf$reduce_mean(qs$log_prob(s_samples), 0L)) +
-    tf$reduce_sum(gamma * tf$log(gamma))
+    tf$reduce_sum(tf$where(gamma == 0, tf$zeros(shape = gamma$shape, dtype = dtype), gamma * tf$log(gamma)))
 
 
   elbo <- EE_p_y + E_log_p_p - E_log_q
 
-  # Extra tensors required to initialize gamma
-  p_y_on_c_ <- p_y_on_c
-  p_y_on_c_norm <- tf$reshape(tf$reduce_logsumexp(p_y_on_c_, 1L), c(S, 1L, -1L))
-  gamma_init <- tf$transpose(tf$reduce_mean(tf$exp(p_y_on_c - p_y_on_c_norm), 0L))
+  gamma_init <- tf$transpose(tf$reduce_mean(p_y_on_c, axis=0L)) 
+  git <- tf$transpose(gamma_init) - tf$reduce_mean(gamma_init, 1L)
+  gamma_init <- tf$transpose(tf$constant(initial_shrink, dtype=dtype) * git / tf$reduce_mean(tf$abs(git), 0L))
   gamma_init_ph <- tf$placeholder(shape = shape(N,C), dtype=dtype)
-  init_gamma <- tf$assign(gamma_logits, tf$log(gamma_init_ph) )
+  init_gamma <- tf$assign(gamma_logits, gamma_init_ph)
 
   # Optimizer for ELBO ----------
   optimizer <- tf$train$AdamOptimizer(learning_rate = learning_rate)
@@ -351,7 +332,7 @@ inference_tflow <- function(Y_dat,
   init <- tf$global_variables_initializer()
   sess$run(init)
 
-  fd <- dict(Y = Y_dat, L = L_dat)
+  fd <- dict(Y = Y_dat, L = L_dat, S = as.integer(mc_samples))
 
   if(P > 0) {
     fd$update(dict(X = x))
@@ -364,28 +345,35 @@ inference_tflow <- function(Y_dat,
   }
 
   # Initialize gamma correctly
-  gi <- sess$run(gamma_init, feed_dict = fd)
-  sess$run(init_gamma, feed_dict = dict(gamma_init_ph = gi))
-
+  if(TRUE) {
+    gi <- sess$run(gamma_init, feed_dict = fd)
+    sess$run(init_gamma, feed_dict = dict(gamma_init_ph = gi))
+  }
 
   elbo_val <- sess$run(elbo, feed_dict = fd)
-
+  
   if(is.na(elbo_val)) {
     stop("Initial elbo is NA")
   }
 
   elbo_diff <- Inf
-  elbos <- NULL
+  elbos <- elbo_val
+  
+  if(verbose) {
+    message("Optimizing ELBO")
+    pb <- progress_bar$new(total = max_iter+1,
+                           format = "  running VB [:bar] :percent | change in elbo :change")
+    
+    pb$tick(0,tokens = list(change = glue("{elbo_diff}%")))
+  }
 
-  pb <- progress_bar$new(total = max_iter+1,
-                         format = "  running VB [:bar] :percent | change in elbo :change")
-
-  pb$tick(0,tokens = list(change = glue("{elbo_diff}%")))
 
 
 
   for( i in seq_len(max_iter) ) {
-    pb$tick(tokens = list(change = glue("{round2(elbo_diff)}%")))
+    if(verbose) {
+      pb$tick(tokens = list(change = glue("{round2(elbo_diff)}%")))
+    }
 
     sess$run(train, feed_dict = fd)
 
@@ -400,10 +388,11 @@ inference_tflow <- function(Y_dat,
   }
 
   if(verbose) {
-    message("clonealign inference complete")
+    message("\nELBO converged or reached max iterations")
   }
+  
 
-  rlist <- sess$run(list( tf$reduce_mean(qmu$sample(50L), 0L), gamma, s, tf$reduce_mean(phi_samples, 0L), tf$exp(log_alpha), a, b), feed_dict = fd)
+  rlist <- sess$run(list( softplus(sess$run(qmu$distribution$loc)), gamma, s, tf$exp(log_alpha)), feed_dict = fd)
   if(P > 0) {
     rlist$beta <- sess$run(beta, feed_dict = fd)
   }
@@ -420,27 +409,39 @@ inference_tflow <- function(Y_dat,
     clone_probs_from_snv <- tf$exp(tf$transpose(v_log_prob) - tf$reduce_logsumexp(v_log_prob, 1L))
     clone_probs_from_snv <- t(sess$run(clone_probs_from_snv, feed_dict = fd))
   }
+  
+  if(verbose) {
+    message("Computing final ELBO")
+  }
+  
+  # Get the final ELBO
+  final_elbo <- replicate(20, {
+    elbo_val <- sess$run(elbo, feed_dict = fd)
+  })
+  
+  rlist$final_elbo <- mean(final_elbo)
+  rlist$sd_final_elbo <- sd(final_elbo)
 
   # Close the session ----------
   sess$close()
 
   rlist$elbos <- elbos
+  
 
   # Correctly name the return vector
   if(P > 0 && K > 0) {
-    names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "a", "b", "beta", "psi", "W", "chi", "elbo")
+    names(rlist) <- c("mu", "gamma", "s", "alpha", "beta", "psi", "W", "chi", "final_elbo", "sd_final_elbo", "elbo")
   } else if (K > 0 && P == 0) {
-    names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "a", "b", "psi", "W", "chi", "elbo")
+    names(rlist) <- c("mu", "gamma", "s", "alpha", "psi", "W", "chi", "final_elbo", "sd_final_elbo", "elbo")
   } else if (K == 0 && P == 0) {
-    names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "a", "b", "elbo")
+    names(rlist) <- c("mu", "gamma", "s", "alpha", "final_elbo", "sd_final_elbo", "elbo")
   } else {
-    names(rlist) <- c("mu", "gamma", "s", "phi", "alpha", "a", "b", "elbo")
+    names(rlist) <- c("mu", "gamma", "s", "alpha", "final_elbo", "sd_final_elbo", "elbo")
   }
 
   rlist$mu <- c(1, rlist$mu) # Add on the constant at the end
 
   rlist$retained_genes <- retained_genes
-  rlist$basis_means <- basis_means_fixed
   rlist$clone_probs_from_snv <- clone_probs_from_snv
 
   return(rlist)
