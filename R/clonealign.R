@@ -170,7 +170,7 @@ clonealign <- function(gene_expression_data,
                        cov = NULL,
                        ref = NULL,
                        fix_alpha = FALSE,
-                       dtype = "float64",
+                       dtype = "float32",
                        saturate = TRUE,
                        saturation_threshold = 6,
                        K = NULL,
@@ -178,6 +178,7 @@ clonealign <- function(gene_expression_data,
                        verbose = TRUE,
                        seed = NULL,
                        initial_shrink = 5,
+                       clone_call_probability = 0.95,
                        data_init_mu = TRUE) {
   
 
@@ -258,7 +259,7 @@ clonealign <- function(gene_expression_data,
 
 
   rlist <- list(
-    clone = clone_assignment(tflow_res)
+    clone = clone_assignment(tflow_res$gamma, colnames(L), clone_call_probability)
   )
 
   ml_params <- list(
@@ -291,17 +292,12 @@ clonealign <- function(gene_expression_data,
   }
 
   # Finally map clone names back to fitted values
-  clone_names <- colnames(L)
-  if(!is.null(L)) {
-    rlist$clone <- plyr::mapvalues(rlist$clone,
-                                   from = seq_len(C),
-                                   to = clone_names)
-    colnames(rlist$ml_params$clone_probs) <- clone_names
+  colnames(rlist$ml_params$clone_probs) <- colnames(L)
 
-    if("clone_probs_from_snv" %in% names(rlist)) {
-      colnames(rlist$clone_probs_from_snv) <- clone_names
-    }
+  if("clone_probs_from_snv" %in% names(rlist)) {
+      colnames(rlist$clone_probs_from_snv) <- colnames(L)
   }
+  
 
   rlist$correlations <- compute_correlations(Y, L, rlist$clone)
 
@@ -310,6 +306,10 @@ clonealign <- function(gene_expression_data,
 }
 
 compute_correlations <- function(Y, L, clones) {
+  unassigned <- clones == "unassigned"
+  Y <- Y[!unassigned,]
+  clones <- clones[!unassigned]
+  
   sapply(seq_len(ncol(Y)), function(i) {
     y <- Y[,i]
     x <- L[i, clones]

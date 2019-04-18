@@ -16,8 +16,13 @@ softplus <- function(x) {
 #' @param tflow_res List returned by \code{inference_tflow}
 #' @return A vector of maximum likelihood clone assignments
 #' @keywords internal
-clone_assignment <- function(tflow_res) {
-  apply(tflow_res$gamma, 1, which.max)
+clone_assignment <- function(gamma, clone_names, clone_assignment_probability = 0.99) {
+  apply(gamma, 1, function(r) {
+    if(max(r) < clone_assignment_probability) {
+      return("unassigned")
+    }
+    return(clone_names[which.max(r)])
+  })
 }
 
 #' Round a number to two significant figures
@@ -52,7 +57,7 @@ inference_tflow <- function(Y_dat,
                             dtype = c("float32", "float64"),
                             saturate = TRUE,
                             saturation_threshold = 6,
-                            K = 6,
+                            K = 1,
                             mc_samples = 1,
                             verbose = TRUE,
                             initial_shrink = 5,
@@ -225,7 +230,7 @@ inference_tflow <- function(Y_dat,
   log_alpha <- tf$nn$log_softmax(alpha_unconstr)
 
   # Variational variables for mu and z ----------
-  sdinit <- .5
+  sdinit <- 1
   
   qmu <- tfd$TransformedDistribution(
     bijector = tfb$Softplus(),
@@ -303,7 +308,7 @@ inference_tflow <- function(Y_dat,
     tf$reduce_sum(tfd$Normal(loc = tf$zeros(1, dtype = dtype), scale = tf$ones(1, dtype = dtype))$log_prob(tf$log(mmu_samples))) / tf$to_float(S) +
     tf$reduce_sum(tfd$Dirichlet(tf$constant(rep(1, C), dtype = dtype))$log_prob(tf$exp(log_alpha)))
 
-  if(K>0) {
+  if(K > 0) {
     E_log_p_p <- E_log_p_p + W_log_prob + chi_log_prob + tf$reduce_sum(p_psi)
   }
 
@@ -392,7 +397,7 @@ inference_tflow <- function(Y_dat,
   }
   
 
-  rlist <- sess$run(list( softplus(sess$run(qmu$distribution$loc)), gamma, s, tf$exp(log_alpha)), feed_dict = fd)
+  rlist <- sess$run(list( tf$nn$softplus(qmu$distribution$loc),gamma, s, tf$exp(log_alpha)), feed_dict = fd)
   if(P > 0) {
     rlist$beta <- sess$run(beta, feed_dict = fd)
   }
