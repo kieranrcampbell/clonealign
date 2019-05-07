@@ -16,7 +16,7 @@ softplus <- function(x) {
 #' @param tflow_res List returned by \code{inference_tflow}
 #' @return A vector of maximum likelihood clone assignments
 #' @keywords internal
-clone_assignment <- function(gamma, clone_names, clone_assignment_probability = 0.99) {
+clone_assignment <- function(gamma, clone_names, clone_assignment_probability = 0.95) {
   apply(gamma, 1, function(r) {
     if(max(r) < clone_assignment_probability) {
       return("unassigned")
@@ -194,7 +194,6 @@ inference_tflow <- function(Y_dat,
   s_init <- rowSums(data$Y)
 
   mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
-  mu_guess <- mu_guess[-1] / mu_guess[1]
 
   
   beta_init <- matrix(0, nrow = G, ncol = P)
@@ -235,24 +234,25 @@ inference_tflow <- function(Y_dat,
   qmu <- tfd$TransformedDistribution(
     bijector = tfb$Softplus(),
     distribution = tfd$Normal(loc = tf$Variable(tf$constant(safe_inverse_softplus(mu_guess),dtype=dtype)),
-                              scale = tf$exp(tf$Variable(tf$constant(rep(log(sdinit), G-1), dtype = dtype)))),
+                              scale = tf$exp(tf$Variable(tf$constant(rep(log(sdinit), G), dtype = dtype)))),
 
     name = "qmu"
   )
 
-  S <- tf$placeholder(dtype=tf$int32) #  as.integer(mc_samples)
+  S <- as.integer(mc_samples) # tf$placeholder(dtype=tf$int32) #  
   if(!is.null(seed)) {
-    mmu_samples <- qmu$sample(S, seed = ss())
+    mu_samples <- qmu$sample(S, seed = ss())
   } else {
-    mmu_samples <- qmu$sample(S)
+    mu_samples <- qmu$sample(S)
   }
   
   # mmu_samples is shaped S by (n_genes - 1)
   
-  mu_one_sample <- tf$reshape(tf$ones(shape = S, dtype = dtype), c(-1L, 1L))
+  # mu_one_sample <- tf$reshape(tf$ones(shape = S, dtype = dtype), c(-1L, 1L))
   
   # mu_samples is shped S by n_genes
-  mu_samples <- tf$concat(list(mu_one_sample, mmu_samples), axis = 1L)
+  # mu_samples <- tf$concat(list(mu_one_sample, mmu_samples), axis = 1L)
+  # browser()
 
   gamma_logits <- tf$Variable(tf$zeros(shape(N,C) , dtype = dtype)) 
   gamma <- tf$nn$softmax(gamma_logits)
@@ -305,8 +305,8 @@ inference_tflow <- function(Y_dat,
   }
   # (ii) E_q[log p(theta)]
   E_log_p_p <- tf$reduce_sum(log_alpha * gamma) +
-    tf$reduce_sum(tfd$Normal(loc = tf$zeros(1, dtype = dtype), scale = tf$ones(1, dtype = dtype))$log_prob(tf$log(mmu_samples))) / tf$to_float(S) +
-    tf$reduce_sum(tfd$Dirichlet(tf$constant(rep(1, C), dtype = dtype))$log_prob(tf$exp(log_alpha)))
+    tf$reduce_sum(tfd$Normal(loc = tf$zeros(1, dtype = dtype), scale = tf$ones(1, dtype = dtype))$log_prob(tf$log(mu_samples))) / tf$to_float(S) +
+    tf$reduce_sum(tfd$Dirichlet(tf$constant(rep(0.1, C), dtype = dtype))$log_prob(tf$exp(log_alpha)))
 
   if(K > 0) {
     E_log_p_p <- E_log_p_p + W_log_prob + chi_log_prob + tf$reduce_sum(p_psi)
@@ -314,7 +314,7 @@ inference_tflow <- function(Y_dat,
 
 
   # (iii) E_q[log q]
-  E_log_q <- tf$reduce_sum(tf$reduce_mean(qmu$log_prob(mmu_samples), 0L)) +
+  E_log_q <- tf$reduce_sum(tf$reduce_mean(qmu$log_prob(mu_samples), 0L)) +
     tf$reduce_sum(tf$where(gamma == 0, tf$zeros(shape = gamma$shape, dtype = dtype), gamma * tf$log(gamma)))
 
 
@@ -337,7 +337,7 @@ inference_tflow <- function(Y_dat,
   init <- tf$global_variables_initializer()
   sess$run(init)
 
-  fd <- dict(Y = Y_dat, L = L_dat, S = as.integer(mc_samples))
+  fd <- dict(Y = Y_dat, L = L_dat)
 
   if(P > 0) {
     fd$update(dict(X = x))
