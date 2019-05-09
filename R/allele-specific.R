@@ -3,8 +3,15 @@
 #' Construct allele specific complete data likelihood
 #'
 #' Returns cell-by-clone complete likelihood
+#' 
+#' @param clone_allele_ph Tensorflow placeholder for copy number at each variant position
+#' @param alt_ph Tensorflow placeholder for alternative count
+#' @param cov_ph Tensorflow placeholder for coverage count
+#' @param dtype Tensorflow dtype
+#' @param C Number of clones
+#' @param N Number of cells
 #'
-#' @export
+#' @keywords internal
 construct_ai_likelihood <- function(clone_allele_ph, alt_ph, cov_ph, dtype, C, N) {
   params_1 <- list(low = c('alpha'=0.1, 'beta'=1.9),
                    high = c('alpha'=1.9, 'beta'=0.1))

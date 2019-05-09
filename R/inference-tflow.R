@@ -72,10 +72,6 @@ inference_tflow <- function(Y_dat,
     stop(msg)
   }
 
-
-  random_init <- FALSE
-
-
   # Get distributions
   tfp <- reticulate::import("tensorflow_probability")
   tfd <- tfp$distributions
@@ -197,18 +193,12 @@ inference_tflow <- function(Y_dat,
 
   
   beta_init <- matrix(0, nrow = G, ncol = P)
-  
-  if(random_init) {
-    beta_init <- matrix(rnorm(beta_init), nrow = G, ncol = P)
-  }
+
   
   if(!data_init_mu) {
     mu_guess <- rep(1, length(mu_guess))
   }
-  
-  if(random_init) {
-    mu_guess <- softplus(rnorm(length(mu_guess)))
-  }
+
 
   # Variables to be optimized ----------
   W <- tf$Variable(tf$zeros(shape = c(G, K), dtype = dtype))
@@ -239,20 +229,12 @@ inference_tflow <- function(Y_dat,
     name = "qmu"
   )
 
-  S <- as.integer(mc_samples) # tf$placeholder(dtype=tf$int32) #  
+  S <- as.integer(mc_samples) 
   if(!is.null(seed)) {
     mu_samples <- qmu$sample(S, seed = ss())
   } else {
     mu_samples <- qmu$sample(S)
   }
-  
-  # mmu_samples is shaped S by (n_genes - 1)
-  
-  # mu_one_sample <- tf$reshape(tf$ones(shape = S, dtype = dtype), c(-1L, 1L))
-  
-  # mu_samples is shped S by n_genes
-  # mu_samples <- tf$concat(list(mu_one_sample, mmu_samples), axis = 1L)
-  # browser()
 
   gamma_logits <- tf$Variable(tf$zeros(shape(N,C) , dtype = dtype)) 
   gamma <- tf$nn$softmax(gamma_logits)
@@ -306,7 +288,7 @@ inference_tflow <- function(Y_dat,
   # (ii) E_q[log p(theta)]
   E_log_p_p <- tf$reduce_sum(log_alpha * gamma) +
     tf$reduce_sum(tfd$Normal(loc = tf$zeros(1, dtype = dtype), scale = tf$ones(1, dtype = dtype))$log_prob(tf$log(mu_samples))) / tf$to_float(S) +
-    tf$reduce_sum(tfd$Dirichlet(tf$constant(rep(0.1, C), dtype = dtype))$log_prob(tf$exp(log_alpha)))
+    tf$reduce_sum(tfd$Dirichlet(tf$constant(rep(0.0001, C), dtype = dtype))$log_prob(tf$exp(log_alpha)))
 
   if(K > 0) {
     E_log_p_p <- E_log_p_p + W_log_prob + chi_log_prob + tf$reduce_sum(p_psi)
@@ -350,10 +332,9 @@ inference_tflow <- function(Y_dat,
   }
 
   # Initialize gamma correctly
-  if(TRUE) {
-    gi <- sess$run(gamma_init, feed_dict = fd)
-    sess$run(init_gamma, feed_dict = dict(gamma_init_ph = gi))
-  }
+  gi <- sess$run(gamma_init, feed_dict = fd)
+  sess$run(init_gamma, feed_dict = dict(gamma_init_ph = gi))
+
 
   elbo_val <- sess$run(elbo, feed_dict = fd)
   
@@ -362,32 +343,41 @@ inference_tflow <- function(Y_dat,
   }
 
   elbo_diff <- Inf
+  elbo_diffs <- rep(1e3, 10)
   elbos <- elbo_val
   
   if(verbose) {
     message("Optimizing ELBO")
     pb <- progress_bar$new(total = max_iter+1,
-                           format = "  running VB [:bar] :percent | change in elbo :change")
+                           format = "  running VB [:bar] :percent | elbo :elbo | chg elbo :meanchange")
     
-    pb$tick(0,tokens = list(change = glue("{elbo_diff}%")))
+    pb$tick(0,tokens = list(change = glue("{elbo_diff}%"),
+                            elbo = elbo_val,
+                            meanchange = NA))
   }
-
 
 
 
   for( i in seq_len(max_iter) ) {
     if(verbose) {
-      pb$tick(tokens = list(change = glue("{round2(elbo_diff)}%")))
+      pb$tick(tokens = list(change = glue("{round2(elbo_diff)}%"),
+                            elbo = elbo_val,
+                            meanchange = glue("{100*signif(mean(abs(elbo_diffs)), 2)}%")))
     }
 
     sess$run(train, feed_dict = fd)
 
     elbo_new <- sess$run(elbo, feed_dict = fd)
     elbo_diff <- (elbo_new - elbo_val)/abs(elbo_val)
+    elbo_diffs <- c(elbo_diffs[-1], elbo_diff)
     elbos <- c(elbos, elbo_new)
     elbo_val <- elbo_new
+    
+    if(is.na(elbo_new)) {
+      browser()
+    }
 
-    if(abs(elbo_diff) < rel_tol)
+    if(mean(abs(elbo_diffs)) < rel_tol)
       break
 
   }
@@ -444,7 +434,6 @@ inference_tflow <- function(Y_dat,
     names(rlist) <- c("mu", "gamma", "s", "alpha", "final_elbo", "sd_final_elbo", "elbo")
   }
 
-  rlist$mu <- c(1, rlist$mu) # Add on the constant at the end
 
   rlist$retained_genes <- retained_genes
   rlist$clone_probs_from_snv <- clone_probs_from_snv

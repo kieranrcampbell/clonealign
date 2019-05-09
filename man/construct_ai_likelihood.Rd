@@ -6,6 +6,20 @@
 \usage{
 construct_ai_likelihood(clone_allele_ph, alt_ph, cov_ph, dtype, C, N)
 }
+\arguments{
+\item{clone_allele_ph}{Tensorflow placeholder for copy number at each variant position}
+
+\item{alt_ph}{Tensorflow placeholder for alternative count}
+
+\item{cov_ph}{Tensorflow placeholder for coverage count}
+
+\item{dtype}{Tensorflow dtype}
+
+\item{C}{Number of clones}
+
+\item{N}{Number of cells}
+}
 \description{
 Returns cell-by-clone complete likelihood
 }
+\keyword{internal}

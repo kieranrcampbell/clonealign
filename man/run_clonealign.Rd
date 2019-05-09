@@ -5,7 +5,8 @@
 \title{Run clonealign across a range of initializations}
 \usage{
 run_clonealign(gene_expression_data, copy_number_data,
-  initial_shrinks = c(0, 2, 5, 10), print_elbos = TRUE, ...)
+  initial_shrinks = c(0, 5, 10), n_repeats = 3, print_elbos = TRUE,
+  ...)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -15,6 +16,8 @@ run_clonealign(gene_expression_data, copy_number_data,
 See \code{?clonealign}.}
 
 \item{initial_shrinks}{Initial shrinkages for the clone assignment variational parameters}
+
+\item{n_repeats}{Number of fits to perform at each initial shrink}
 
 \item{print_elbos}{Logical - should the ELBOs inferred be printed?}
 

@@ -4,13 +4,13 @@
 \alias{clonealign}
 \title{Assign scRNA-seq to clone-of-origin}
 \usage{
-clonealign(gene_expression_data, copy_number_data, max_iter = 100,
+clonealign(gene_expression_data, copy_number_data, max_iter = 200,
   rel_tol = 1e-06, gene_filter_threshold = 0, learning_rate = 0.1,
   x = NULL, clone_allele = NULL, cov = NULL, ref = NULL,
-  fix_alpha = FALSE, size_factors = "fixed", dtype = "float64",
-  saturate = TRUE, saturation_threshold = 6, K = NULL,
-  mc_samples = 1, verbose = TRUE, seed = NULL, initial_shrink = 5,
-  data_init_mu = TRUE)
+  fix_alpha = FALSE, dtype = "float32", saturate = TRUE,
+  saturation_threshold = 6, K = NULL, mc_samples = 1,
+  verbose = TRUE, seed = NULL, initial_shrink = 5,
+  clone_call_probability = 0.95, data_init_mu = TRUE)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -32,10 +32,14 @@ be filtered out (removes genes with no counts by default)}
 \item{x}{An optional vector of covariates, e.g. corresponding to batch or patient. Can be a vector of a single
 covariate or a sample by covariate matrix. Note this should not contain an intercept.}
 
+\item{clone_allele}{A clone-by-variant matrix of copy numbers for each variant}
+
+\item{cov}{A cell-by-variant matrix of coverage counts}
+
+\item{ref}{A cell-by-variant matrix of reference allele counts}
+
 \item{fix_alpha}{Should the underlying priors for clone frequencies be fixed? Default TRUE
 (values are inferred from the data)}
-
-\item{size_factors}{Either "fixed", "infer", or a numeric vector of size factors. See \code{details}.}
 
 \item{dtype}{The dtype for tensorflow useage, either "float32" or "float64"}
 
@@ -46,12 +50,19 @@ covariate or a sample by covariate matrix. Note this should not contain an inter
 \item{K}{The dimensionality of the expression latent space. If left \code{NULL}, K is set to 1 if fewer than 100 genes
 are present and 6 otherwise.}
 
+\item{mc_samples}{The number of Monte Carlo samples to use to estimate the ELBO}
+
 \item{verbose}{Should warnings and EM convergence information be printed? Default TRUE}
 
 \item{seed}{The random seed. See \code{details}.}
 
 \item{initial_shrink}{The strength with which the variational parameters for clone assignments are
 initially shrunk towards the most likely assignments. See \code{?run_clonealign}.}
+
+\item{clone_call_probability}{The probability above which a cell is assigned to a clone. If no clone has probability greater
+than this value, then the clone is "unassigned".}
+
+\item{data_init_mu}{Should the mu parameters be initialized using the data? (This typically speeds up convergence)}
 }
 \value{
 An object of class \code{clonealign_fit}. The maximum likelihood estimates of the

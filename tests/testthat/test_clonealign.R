@@ -18,9 +18,9 @@ test_that("clonealign(...) returns a valid object", {
 
   expect_equal(length(clones), N)
 
-  clonenames_sorted <- sort(unique(clones))
+  inferred_clones <- unique(clones)
 
-  expect_equal(clonenames_sorted, sort(colnames(L)))
+  expect_true(all(inferred_clones %in% c(colnames(L), "unassigned")))
 
   expect_equal(C, ncol(cal$ml_params$clone_probs))
 

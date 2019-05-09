@@ -9,6 +9,7 @@
 #' @param copy_number_data A matrix or data frame of copy number calls for each clone.
 #' See \code{?clonealign}.
 #' @param initial_shrinks Initial shrinkages for the clone assignment variational parameters
+#' @param n_repeats Number of fits to perform at each initial shrink
 #' @param print_elbos Logical - should the ELBOs inferred be printed?
 #' @param ... Additional arguments to pass to \code{clonealign(...)}
 #' 
@@ -83,7 +84,13 @@ run_clonealign <- function(gene_expression_data,
 #' are present and 6 otherwise.
 #' @param initial_shrink The strength with which the variational parameters for clone assignments are
 #' initially shrunk towards the most likely assignments. See \code{?run_clonealign}.
-#' @param size_factors Either "fixed", "infer", or a numeric vector of size factors. See \code{details}.
+#' @param clone_allele A clone-by-variant matrix of copy numbers for each variant
+#' @param cov A cell-by-variant matrix of coverage counts
+#' @param ref A cell-by-variant matrix of reference allele counts
+#' @param mc_samples The number of Monte Carlo samples to use to estimate the ELBO
+#' @param clone_call_probability The probability above which a cell is assigned to a clone. If no clone has probability greater
+#' than this value, then the clone is "unassigned".
+#' @param data_init_mu Should the mu parameters be initialized using the data? (This typically speeds up convergence)
 #' @param seed The random seed. See \code{details}.
 #'
 #'
@@ -305,6 +312,15 @@ clonealign <- function(gene_expression_data,
 
 }
 
+#' Post-hoc compute correlations between copy number and expression
+#' 
+#' @param Y Cell by gene count matrix
+#' @param L Gene by clone copy number matrix
+#' @param clones Assigned clones
+#' 
+#' @keywords internal
+#' 
+#' @importFrom stats cor
 compute_correlations <- function(Y, L, clones) {
   unassigned <- clones == "unassigned"
   Y <- Y[!unassigned,]
@@ -313,7 +329,9 @@ compute_correlations <- function(Y, L, clones) {
   sapply(seq_len(ncol(Y)), function(i) {
     y <- Y[,i]
     x <- L[i, clones]
-    cor(x,y)
+    suppressWarnings({
+      cor(x,y)
+    })
   })
 }
 
@@ -390,167 +408,6 @@ saturate <- function(x, threshold = 4) {
 }
 
 
-#' Evaluate the quality of a clonealign fit
-#'
-#' Use mean squared error of predicting the expression of held-out genes to evaluate the quality of a clonealign fit.
-#'
-#' @param gene_expression_data Either a \code{SingleCellExperiment} or matrix of counts, same as input to \code{clonealign}
-#' @param copy_number_data A gene-by-clone matrix of copy numbers, the same as the input to \code{clonealign}
-#' @param clonealign_fit The fit returned by a call to \code{clonealign()} on the full geneset
-#' @param prop_holdout The proportion of genes to hold out as a \emph{test} set for predicting gene expression
-#' @param n_samples The number of random permutations to establish a null distribution of predictive performance
-#' @param s Vector of cell size factors - defaults to the total counts per cell
-#' @param ... Additional arguments to pass to the \code{clonealign} call
-#'
-#' @return A list object describing the evaluation results. See \code{details}
-#'
-#' @details
-#'
-#' This evaluation function is built around the idea of how good predicted expression is under the model given
-#' the inferred (assigned) clones compared to how well you could predict expression given a random clonal assignment.
-#'
-#' \strong{Evaluations performed}
-#'
-#' \enumerate{
-#' \item On the \emph{full} dataset, the mean square error is compared to the randomized error, and a message
-#' printed about the ratio of the two errors and the proportion of time the observed error was less than the
-#' error under a null distribution. If either the error under the null is smaller than the observed, or is
-#' smaller some percentage of time, then the fit has real problems and should be abandoned as it suggests the
-#' model is stuck in a local maxima (which could happen if the proposed clones aren't actually present in the
-#' RNA-seq).
-#' \item A certain proportion of genes (as decided by the \code{prop_holdout} parameter) are held out as a \emph{test}
-#' set, and the clonealign fit is re-performed on the \code{1 - prop_holdout} proportion of genes. The function will then
-#' print an agreement table of clone assignments between the full table and the reduced table. If these vastly disagree
-#' for only a small change in gene set (ie \code{prop_holdout} is around 0.1 or 0.2), then the fit may be unreliable
-#' as it is sensitive to the genes inputted.
-#' \item The same metrics from (1) are then printed where the evaluations are performed on the heldout set. Again,
-#' if the observed mean squared error given the clonealign fit isn't less than the null mean squared error
-#' a large proportion of the time, the fit may be unreliable.
-#'
-#' }
-#'
-#' \strong{Object returned}
-#'
-#' Everything computed above is returned in a list object with the following entries:
-#'
-#' \itemize{
-#' \item full_clonealign_fit - the original clonealign fit on the full gene set that was passed in as the
-#' \code{clonealign_fit} argument
-#' \item full_observed_mse - the observed mean square error using the full gene set
-#' \item full_null_mse - A vector of mean square error under the randomized (permuted) distribution
-#' \item reduced_clonealign_fit - a clonealign fit on only the reduced (train) set of genes
-#' \item heldout_genes - the names of the genes held out (test set) for evaluating predictive performance
-#' out-of-sample
-#' \item kept_names - the names of retained genes as part of the reduced (train) set
-#' \item heldout_observed_mse - the observed mean square error on the heldout (test) set of genes
-#' \item heldout_null_mse - a vector of mean square errors under a null distribution of randomly permuting the clones
-#'
-#' }
-#'
-#'
-#'
-#' @importFrom glue glue
-#' @export
-#'
-#' @examples
-#' library(SingleCellExperiment)
-#' data(example_clonealign_fit)
-#' data(example_sce)
-#' copy_number_data <- rowData(example_sce)[,c("A", "B", "C")]
-#' evaluate_clonealign(example_sce, copy_number_data, example_clonealign_fit)
-#'
-evaluate_clonealign <- function(gene_expression_data,
-                    copy_number_data,
-                    clonealign_fit,
-                    prop_holdout = 0.2,
-                    n_samples = 2,
-                    s = NULL,
-                    ...) {
-
-  N <- NA # Number of cells
-  G <- NA # Number of genes
-  C <- NA # Number of clones
-
-
-  # Parse gene expression data first
-  if(is(gene_expression_data, "SingleCellExperiment") || is(gene_expression_data, "SummarizedExperiment")) {
-    assay_names <- names(assays(gene_expression_data))
-    if(!("counts" %in% assay_names)) {
-      stop(paste("counts not in assays(gene_expression_data). Available assays:", paste(assay_names, collapse = ",")))
-    }
-    Y <- t(as.matrix(assay(gene_expression_data, "counts")))
-  } else if(is(gene_expression_data, "matrix")) {
-    Y <- gene_expression_data
-  } else {
-    stop("Input gene_expression_data must be SingleCellExperiment, SummarizedExperiment, or matrix")
-  }
-  N <- nrow(Y)
-  G <- ncol(Y)
-
-  # Parse cnv data
-  if(is(copy_number_data, "data.frame") || is(copy_number_data, "DataFrame")) {
-    L <- as.matrix(copy_number_data)
-  } else if(is(copy_number_data, "matrix")) {
-    L <- copy_number_data
-  } else {
-    stop(paste("copy_number_data must be a matrix, data.frame or DataFrame. Current class:", class(copy_number_data)))
-  }
-
-  if(nrow(L) != G) {
-    stop("copy_number_data must have same number of genes (rows) as gene_expression_data")
-  }
-
-  rownames(L) <- colnames(Y)
-
-  C <- ncol(L)
-
-  # Compute mse on full data set
-  observed_mse <- compute_ca_fit_mse(clonealign_fit, Y, L)
-  null_mse <- replicate(n_samples, compute_ca_fit_mse(clonealign_fit,
-                                                Y,
-                                                L,
-                                                random_clones = TRUE))
-
-  cat(glue("On the full dataset, the observed MSE was on average {mean(null_mse) / observed_mse} times smaller than under a null model"))
-  cat(glue(" and smaller {100 * mean(observed_mse < mean(null_mse))}% of the time"))
-  cat("\n")
-
-  # Fix which indices we're going to hold out
-  genes <- colnames(Y)
-  heldout_genes <- sample(genes, round(prop_holdout * G))
-  kept_genes <- setdiff(genes, heldout_genes)
-
-  # Fit reduced clonealign model
-  message("Fitting reduced clonealign model...")
-  ca <- clonealign(Y[, kept_genes], L[kept_genes,], verbose = FALSE, ...)
-
-  tbl <- table(ca$clone, clonealign_fit$clone)
-
-
-  cat("Agreement between original (rows) and reduced (columns):")
-  print(tbl)
-
-  # Compute mse on held out:
-  observed_mse_ho <- compute_ca_fit_mse(ca, Y[, heldout_genes], L[heldout_genes,], model_mu = FALSE)
-  null_mse_ho <- replicate(n_samples, compute_ca_fit_mse(ca, Y[, heldout_genes], L[heldout_genes,], model_mu = FALSE, random_clones = TRUE))
-
-  cat(glue("On the held-out dataset, the observed MSE was on average {mean(null_mse_ho) / observed_mse_ho} times smaller than under a null model"))
-  cat(glue(" and smaller {100 * mean(observed_mse_ho < mean(null_mse_ho))}% of the time"))
-  cat("\n")
-
-  list(
-    full_clonealign_fit = clonealign_fit,
-    full_observed_mse = observed_mse,
-    full_null_mse = null_mse,
-    reduced_clonealign_fit = ca,
-    heldout_genes = heldout_genes,
-    kept_genes = kept_genes,
-    heldout_observed_mse = observed_mse_ho,
-    heldout_null_mse = null_mse_ho
-  )
-
-}
-
 #' Compute mean squared error of a clonealign fit
 #'
 #' @keywords internal
@@ -578,25 +435,4 @@ compute_ca_fit_mse <- function(fit, Y, L,
   mse
 }
 
-#' Plot mean dispersion relationship
-#'
-#' @param em An object returned by a call to \code{clonealign}
-#'
-#' @return A \code{ggplot2} plot showing the dispersion as a function of mean
-#' @examples
-#' data(example_clonealign_fit)
-#' plot_mean_dispersion(example_clonealign_fit)
-#' @export
-plot_mean_dispersion <- function(em) {
-  basis_means <- em$basis_means
-  a <- em$ml_params$a
-  b <- em$ml_params$b
-  x <- seq(from = min(basis_means), to = max(basis_means), length.out = 1000)
 
-  y <- sapply(x, function(xx) {
-    sum( a * exp(-b*(xx - basis_means)^2) )
-  })
-
-  ggplot2::qplot(x, y, geom = 'line') +
-    labs(x = expression(mu), y = expression(phi))
-}

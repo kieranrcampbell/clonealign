@@ -4,7 +4,7 @@
 \alias{clone_assignment}
 \title{Computes map clone assignment given EM object}
 \usage{
-clone_assignment(tflow_res)
+clone_assignment(gamma, clone_names, clone_assignment_probability = 0.95)
 }
 \arguments{
 \item{tflow_res}{List returned by \code{inference_tflow}}

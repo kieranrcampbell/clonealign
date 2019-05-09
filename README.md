@@ -8,6 +8,14 @@
   <img src="https://raw.githubusercontent.com/kieranrcampbell/clonealign/master/inst/clonealign_figure.png"  align="middle"/>
 </div>
 
+## Version 2.0
+
+Clonealign version 2.0 comes with several updated modelling features. In particular:
+
+* A multinomial likelihood that vastly increases runtime and removes the need for custom size factors
+* Multiple restarts through the `run_clonealign` function, where the final fit is chosen as that which
+maximizes the ELBO
+
 
 ## Getting started
 
@@ -22,7 +30,7 @@
 
 ```r
 install.packages("tensorflow")
-tensorflow::install_tensorflow(extra_packages ="tensorflow-probability", version="1.12.0")
+tensorflow::install_tensorflow(extra_packages ="tensorflow-probability", version="1.13.1")
 ```
 
 Note that `clonealign` uses the [Tensorflow probability](https://www.tensorflow.org/probability/) library, requiring `Tensorflow` version `>= 1.12.0`, which can be installed using the above.

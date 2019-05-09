@@ -7,10 +7,9 @@
 inference_tflow(Y_dat, L_dat, max_iter = 100, rel_tol = 1e-05,
   learning_rate = 0.1, gene_filter_threshold = 0, x = NULL,
   clone_allele = NULL, cov = NULL, ref = NULL, fix_alpha = FALSE,
-  size_factors = "fixed", dtype = c("float32", "float64"),
-  saturate = TRUE, saturation_threshold = 6, K = 6, mc_samples = 1,
-  verbose = TRUE, initial_shrink = 5, seed = NULL,
-  data_init_mu = data_init_mu)
+  dtype = c("float32", "float64"), saturate = TRUE,
+  saturation_threshold = 6, K = 1, mc_samples = 1, verbose = TRUE,
+  initial_shrink = 5, seed = NULL, data_init_mu = data_init_mu)
 }
 \arguments{
 \item{Y_dat}{Cell by gene matrix of counts}
