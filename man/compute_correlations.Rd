@@ -13,6 +13,9 @@ compute_correlations(Y, L, clones)
 
 \item{clones}{Assigned clones}
 }
+\value{
+A vector of correlations between the copy number and assigned gene expression
+}
 \description{
 Post-hoc compute correlations between copy number and expression
 }

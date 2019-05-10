@@ -12,6 +12,8 @@
 #' @param N Number of cells
 #'
 #' @keywords internal
+#' 
+#' @return The contribution to the likelihood of the allelic imbalance
 construct_ai_likelihood <- function(clone_allele_ph, alt_ph, cov_ph, dtype, C, N) {
   params_1 <- list(low = c('alpha'=0.1, 'beta'=1.9),
                    high = c('alpha'=1.9, 'beta'=0.1))

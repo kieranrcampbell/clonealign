@@ -21,6 +21,8 @@
 #' 
 #' 
 #' @export
+#' 
+#' @return The \code{clonealign_fit} object for the fit that maximizes the ELBO. See \code{?clonealign} for details.
 run_clonealign <- function(gene_expression_data,
                           copy_number_data,
                           initial_shrinks = c(0, 5, 10),
@@ -321,6 +323,8 @@ clonealign <- function(gene_expression_data,
 #' @keywords internal
 #' 
 #' @importFrom stats cor
+#' 
+#' @return A vector of correlations between the copy number and assigned gene expression
 compute_correlations <- function(Y, L, clones) {
   unassigned <- clones == "unassigned"
   Y <- Y[!unassigned,]

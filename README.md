@@ -16,6 +16,8 @@ Clonealign version 2.0 comes with several updated modelling features. In particu
 * Multiple restarts through the `run_clonealign` function, where the final fit is chosen as that which
 maximizes the ELBO
 
+For more info see the NEWS.md file.
+
 
 ## Getting started
 

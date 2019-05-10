@@ -19,6 +19,9 @@ construct_ai_likelihood(clone_allele_ph, alt_ph, cov_ph, dtype, C, N)
 
 \item{N}{Number of cells}
 }
+\value{
+The contribution to the likelihood of the allelic imbalance
+}
 \description{
 Returns cell-by-clone complete likelihood
 }

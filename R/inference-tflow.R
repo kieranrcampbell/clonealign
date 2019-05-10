@@ -373,10 +373,6 @@ inference_tflow <- function(Y_dat,
     elbos <- c(elbos, elbo_new)
     elbo_val <- elbo_new
     
-    if(is.na(elbo_new)) {
-      browser()
-    }
-
     if(mean(abs(elbo_diffs)) < rel_tol)
       break
 

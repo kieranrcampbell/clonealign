@@ -23,6 +23,9 @@ See \code{?clonealign}.}
 
 \item{...}{Additional arguments to pass to \code{clonealign(...)}}
 }
+\value{
+The \code{clonealign_fit} object for the fit that maximizes the ELBO. See \code{?clonealign} for details.
+}
 \description{
 Run \code{clonealign} across a range of initializations and select the fit 
 that acheives the best evidence lower bound (ELBO).
