@@ -188,6 +188,10 @@ inference_tflow <- function(Y_dat,
   pcs <- pcs + matrix(rnorm(nrow(pcs) * ncol(pcs), mean=0, sd = .05), nrow = nrow(pcs))
 
   s_init <- rowSums(data$Y)
+  
+  if(any(s_init == 0)) {
+    stop("Some cells have no counts mapping")
+  }
 
   mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
 
@@ -236,7 +240,7 @@ inference_tflow <- function(Y_dat,
     mu_samples <- qmu$sample(S)
   }
 
-  gamma_logits <- tf$Variable(tf$zeros(shape(N,C) , dtype = dtype)) 
+  gamma_logits <- tf$Variable(tf$zeros(shape(N,C) , dtype = dtype))
   gamma <- tf$nn$softmax(gamma_logits)
 
 
@@ -288,7 +292,7 @@ inference_tflow <- function(Y_dat,
   # (ii) E_q[log p(theta)]
   E_log_p_p <- tf$reduce_sum(log_alpha * gamma) +
     tf$reduce_sum(tfd$Normal(loc = tf$zeros(1, dtype = dtype), scale = tf$ones(1, dtype = dtype))$log_prob(tf$log(mu_samples))) / tf$to_float(S) +
-    tf$reduce_sum(tfd$Dirichlet(tf$constant(rep(0.0001, C), dtype = dtype))$log_prob(tf$exp(log_alpha)))
+    tf$reduce_sum(tfd$Dirichlet(tf$constant(rep(1/C, C), dtype = dtype))$log_prob(tf$exp(log_alpha) + tf$constant(1e-3, dtype = dtype)))
 
   if(K > 0) {
     E_log_p_p <- E_log_p_p + W_log_prob + chi_log_prob + tf$reduce_sum(p_psi)
@@ -297,7 +301,7 @@ inference_tflow <- function(Y_dat,
 
   # (iii) E_q[log q]
   E_log_q <- tf$reduce_sum(tf$reduce_mean(qmu$log_prob(mu_samples), 0L)) +
-    tf$reduce_sum(tf$where(gamma == 0, tf$zeros(shape = gamma$shape, dtype = dtype), gamma * tf$log(gamma)))
+    tf$reduce_sum(tf$where(gamma == 0, tf$zeros(shape = gamma$shape, dtype = dtype), gamma * tf$nn$log_softmax(gamma_logits)))
 
 
   elbo <- EE_p_y + E_log_p_p - E_log_q
@@ -339,6 +343,7 @@ inference_tflow <- function(Y_dat,
   elbo_val <- sess$run(elbo, feed_dict = fd)
   
   if(is.na(elbo_val)) {
+    browser()
     stop("Initial elbo is NA")
   }
 
@@ -372,6 +377,12 @@ inference_tflow <- function(Y_dat,
     elbo_diffs <- c(elbo_diffs[-1], elbo_diff)
     elbos <- c(elbos, elbo_new)
     elbo_val <- elbo_new
+    
+
+    
+    if(is.na(mean(abs(elbo_diffs)))) {
+      browser()
+    }
     
     if(mean(abs(elbo_diffs)) < rel_tol)
       break
@@ -410,29 +421,34 @@ inference_tflow <- function(Y_dat,
     elbo_val <- sess$run(elbo, feed_dict = fd)
   })
   
-  rlist$final_elbo <- mean(final_elbo)
-  rlist$sd_final_elbo <- sd(final_elbo)
+  convergence_info <- list()
+  
+  convergence_info$final_elbo <- mean(final_elbo)
+  convergence_info$sd_final_elbo <- sd(final_elbo)
 
   # Close the session ----------
   sess$close()
 
-  rlist$elbos <- elbos
+  convergence_info$elbos <- elbos
+  
+  names(convergence_info) <- c("final_elbo", "sd_final_elbo", "elbo")
   
 
   # Correctly name the return vector
   if(P > 0 && K > 0) {
-    names(rlist) <- c("mu", "gamma", "s", "alpha", "beta", "psi", "W", "chi", "final_elbo", "sd_final_elbo", "elbo")
+    names(rlist) <- c("mu", "clone_probs", "s", "alpha", "beta", "psi", "W", "chi")
   } else if (K > 0 && P == 0) {
-    names(rlist) <- c("mu", "gamma", "s", "alpha", "psi", "W", "chi", "final_elbo", "sd_final_elbo", "elbo")
+    names(rlist) <- c("mu", "clone_probs", "s", "alpha", "psi", "W", "chi")
   } else if (K == 0 && P == 0) {
-    names(rlist) <- c("mu", "gamma", "s", "alpha", "final_elbo", "sd_final_elbo", "elbo")
+    names(rlist) <- c("mu", "clone_probs", "s", "alpha")
   } else {
-    names(rlist) <- c("mu", "gamma", "s", "alpha", "final_elbo", "sd_final_elbo", "elbo")
+    names(rlist) <- c("mu", "clone_probs", "s", "alpha")
   }
 
-
-  rlist$retained_genes <- retained_genes
-  rlist$clone_probs_from_snv <- clone_probs_from_snv
-
-  return(rlist)
+  list(
+    ml_params = rlist,
+    convergence_info = convergence_info,
+    retained_genes = retained_genes,
+    clone_probs_from_snv = clone_probs_from_snv
+  )
 }

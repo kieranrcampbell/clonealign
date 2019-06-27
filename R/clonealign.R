@@ -44,7 +44,8 @@ run_clonealign <- function(gene_expression_data,
   
   fits <- unlist(fits, recursive = FALSE)
   
-  final_elbos <- sapply(fits, function(ca) ca$final_elbo)
+  final_elbos <- sapply(fits, function(ca) ca$convergence_info$final_elbo)
+  median_correlations <- sapply(fits, function(ca) median(ca$correlations))
   
   if(print_elbos) {
     message(paste("ELBOs: ", paste(final_elbos, collapse= " ")))
@@ -52,7 +53,12 @@ run_clonealign <- function(gene_expression_data,
   
   fit_to_return <- fits[[ which.max(final_elbos) ]]
   
-  fit_to_return$clone_prevalences_at_different_shrinks <- lapply(fits, function(ca) table(ca$clone))
+  fit_to_return$multirun_info <- list()
+  
+  fit_to_return$multirun_info$clone_prevalences_at_different_shrinks <- lapply(fits, function(ca) table(ca$clone))
+  
+  fit_to_return$multirun_info$elbos <- final_elbos
+  fit_to_return$multirun_info$median_correlations <- median_correlations
   
   fit_to_return
 }
@@ -267,50 +273,18 @@ clonealign <- function(gene_expression_data,
 
 
 
-  rlist <- list(
-    clone = clone_assignment(tflow_res$gamma, colnames(L), clone_call_probability)
-  )
-
-  ml_params <- list(
-    clone_probs = tflow_res$gamma,
-    mu = tflow_res$mu,
-    s = tflow_res$s,
-    alpha = tflow_res$alpha
-  )
-
-  if("psi" %in% names(tflow_res)) {
-    ml_params$psi <- tflow_res$psi
-    ml_params$W <- tflow_res$W
-    ml_params$chi <- tflow_res$chi
-  }
-
-  if("beta" %in% names(tflow_res)) {
-    ml_params$beta <- tflow_res$beta
-  }
-
-  rlist$ml_params <- ml_params
-  rlist$elbo <- tflow_res$elbo
-  rlist$retained_genes <- tflow_res$retained_genes
-  rlist$basis_means <- tflow_res$basis_means
-  
-  rlist$final_elbo <- tflow_res$final_elbo
-  rlist$sd_final_elbo <- tflow_res$sd_final_elbo
-
-  if("clone_probs_from_snv" %in% names(tflow_res)) {
-    rlist$clone_probs_from_snv <- tflow_res$clone_probs_from_snv
-  }
+  tflow_res$clone = clone_assignment(tflow_res$ml_params$clone_probs, colnames(L), clone_call_probability)
 
   # Finally map clone names back to fitted values
-  colnames(rlist$ml_params$clone_probs) <- colnames(L)
+  colnames(tflow_res$ml_params$clone_probs) <- colnames(L)
 
-  if("clone_probs_from_snv" %in% names(rlist)) {
-      colnames(rlist$clone_probs_from_snv) <- colnames(L)
+  if(!is.null(clone_allele)) {
+      colnames(tflow_res$clone_probs_from_snv) <- colnames(L)
   }
   
+  tflow_res$correlations <- compute_correlations(Y, L, tflow_res$clone)
 
-  rlist$correlations <- compute_correlations(Y, L, rlist$clone)
-
-  structure(rlist, class = "clonealign_fit")
+  structure(tflow_res, class = "clonealign_fit")
 
 }
 
@@ -328,6 +302,10 @@ clonealign <- function(gene_expression_data,
 compute_correlations <- function(Y, L, clones) {
   unassigned <- clones == "unassigned"
   Y <- Y[!unassigned,]
+  
+  ## Scale Y expression
+  Y <- scale(Y)
+  
   clones <- clones[!unassigned]
   
   sapply(seq_len(ncol(Y)), function(i) {
