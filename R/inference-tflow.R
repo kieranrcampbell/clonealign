@@ -65,7 +65,7 @@ inference_tflow <- function(Y_dat,
                             data_init_mu = data_init_mu) {
 
   # Do a first check that we actually have tensorflow support
-  if(!reticulate::py_module_available("tensorflow")) {
+  if(FALSE) { # !reticulate::py_module_available("tensorflow") && 
     msg <- "Tensorflow does not appear to be installed\n"
     msg <- c(msg, "To install run install.pacakges(\"tensorflow\") then tensorflow::install_tensorflow()\n")
     msg <- c(msg, "For more details see the clonealign vignette or https://tensorflow.rstudio.com/tensorflow/articles/installation.html")

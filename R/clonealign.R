@@ -381,7 +381,7 @@ saturate <- function(x, threshold = 4) {
 }
 
 .onLoad <- function(libpath, pkgname) {
-  if(!reticulate::py_module_available("tensorflow")) {
+  if(!reticulate::py_module_available("tensorflow") && FALSE) {
     msg <- "Tensorflow does not appear to be installed\n"
     msg <- c(msg, "To install run install.pacakges(\"tensorflow\") then tensorflow::install_tensorflow()\n")
     msg <- c(msg, "For more details see the clonealign vignette or https://tensorflow.rstudio.com/tensorflow/articles/installation.html")
@@ -417,4 +417,16 @@ compute_ca_fit_mse <- function(fit, Y, L,
   mse
 }
 
+
+#' Adjust tensorflow installation to correct
+#' @export
+install_tensorflow_for_clonealign <- function() {
+  
+  
+  config <- as.character(reticulate::py_config())[1]
+  pip_path <- gsub("/python", "/pip", config)
+  pip_path <- paste(pip_path, "install --user tensorflow-probability==0.6.0")
+  
+  system(pip_path)
+}
 

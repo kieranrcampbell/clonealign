@@ -28,21 +28,16 @@ For more info see the NEWS.md file.
 
 ### Installation
 
-`clonealign` is built using Google's Tensorflow so requires installation of the R package `tensorflow`:
+`clonealign` is built using Google's Tensorflow so requires installation of the R package `tensorflow`. The versioning of Tensorflow and Tensorflow probability currently breaks the standard installation, so the following steps must be taken:
 
 ```r
 install.packages("tensorflow")
 tensorflow::install_tensorflow(extra_packages ="tensorflow-probability", version="1.13.1")
-```
-
-Note that `clonealign` uses the [Tensorflow probability](https://www.tensorflow.org/probability/) library, requiring `Tensorflow` version `>= 1.12.0`, which can be installed using the above.
-
-`clonealign` can then be installed from github:
-
-```r
 install.packages("devtools") # If not already installed
 install_github("kieranrcampbell/clonealign")
+clonealign::install_tensorflow_for_clonealign()
 ```
+
 
 ### Usage
 
