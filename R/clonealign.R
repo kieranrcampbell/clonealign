@@ -19,6 +19,7 @@
 #' assigned, analagous to the E-step in EM. At 0, they are initialized evenly across clones,
 #' while at 10 they are semi hard assigned to the most likely initial values.
 #' 
+#' @importFrom stats median
 #' 
 #' @export
 #' 
@@ -415,18 +416,5 @@ compute_ca_fit_mse <- function(fit, Y, L,
 
   mse <- mean((predicted_expression - Y)^2)
   mse
-}
-
-
-#' Adjust tensorflow installation to correct
-#' @export
-install_tensorflow_for_clonealign <- function() {
-  
-  
-  config <- as.character(reticulate::py_config())[1]
-  pip_path <- gsub("/python", "/pip", config)
-  pip_path <- paste(pip_path, "install --user tensorflow-probability==0.6.0")
-  
-  system(pip_path)
 }
 

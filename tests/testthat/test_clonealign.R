@@ -30,7 +30,7 @@ test_that("clonealign(...) returns a valid object", {
 
   expect_true(all(c("clone_probs", "mu", "s") %in% names(cal$ml_params)))
   
-  expect_true(all(c("clone", "elbo", "retained_genes", "correlations") %in% names(cal)))
+  expect_true(all(c("clone", "convergence_info", "retained_genes", "correlations", "ml_params") %in% names(cal)))
 
 })
 
