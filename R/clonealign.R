@@ -336,7 +336,7 @@ print.clonealign_fit <- function(x, ...) {
 
   msg <- glue("A clonealign_fit for {N} cells, {G} genes, and {C} clones")
   msg <- glue("{msg}\nTo access clone assignments, call x$clone")
-  msg <- glue("{msg}\nTo access ML parameter estimates, call x$ml_params")
+  msg <- glue("{msg}\nTo access ML parameter estimates, call x$ml_params\n")
   cat(msg)
 }
 
