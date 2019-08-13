@@ -4,6 +4,9 @@ inverse_softplus <- function(x) {
 }
 
 safe_inverse_softplus <- function(x) {
+  if(any(x < 0)) {
+    stop("Inverse softplus only takes positive values")
+  }
   log(1 - exp(-abs(x))) + pmax(x, 0)
 }
 
@@ -23,6 +26,23 @@ clone_assignment <- function(gamma, clone_names, clone_assignment_probability = 
     }
     return(clone_names[which.max(r)])
   })
+}
+
+#' Re-computes map clone assignment at a given threshold
+#'
+#' @param ca A clonealign fit
+#' @return A clonealign fit with clones re-called at different probabilities
+#' @keywords internal
+recompute_clone_assignment <- function(ca, clone_assignment_probability = 0.95) {
+  clone_names <- colnames(ca$ml_params$clone_probs)
+  clones <- apply(ca$ml_params$clone_probs, 1, function(r) {
+    if(max(r) < clone_assignment_probability) {
+      return("unassigned")
+    }
+    return(clone_names[which.max(r)])
+  })
+  ca$clone <- clones
+  ca
 }
 
 #' Round a number to two significant figures
@@ -193,14 +213,25 @@ inference_tflow <- function(Y_dat,
     stop("Some cells have no counts mapping")
   }
 
-  mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
 
   
   beta_init <- matrix(0, nrow = G, ncol = P)
 
-  
-  if(!data_init_mu) {
-    mu_guess <- rep(1, length(mu_guess))
+  if(is.logical(data_init_mu)) {
+    if(data_init_mu) {
+      mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
+    } else {
+      mu_guess <- rep(1, data$G)
+    }
+  } else {
+    if(is.numeric(data_init_mu)) {
+      if(length(data_init_mu == data$G)) {
+        if(verbose) {
+          message("Using user-provided mu values to start")
+        }
+        mu_guess <- data_init_mu / mean(data_init_mu)
+      }
+    }
   }
 
 

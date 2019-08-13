@@ -12,6 +12,7 @@
 #' @param n_repeats Number of fits to perform at each initial shrink
 #' @param print_elbos Logical - should the ELBOs inferred be printed?
 #' @param ... Additional arguments to pass to \code{clonealign(...)}
+#' @param seed Initial seed used to create seeds for multiple runs
 #' 
 #' @details
 #' This function essentially wraps \code{clonealign} and can be interacted with as such. The
@@ -19,13 +20,19 @@
 #' assigned, analagous to the E-step in EM. At 0, they are initialized evenly across clones,
 #' while at 10 they are semi hard assigned to the most likely initial values.
 #' 
+#' Note that the \code{seed} argument here is used to initialize seeds for the different
+#' runs of clonealign -- otherwise each would have the same seed and there would
+#' be no point in multiple runs.
+#' 
 #' @importFrom stats median
+#' @importFrom R.Utils withSeed
 #' 
 #' @export
 #' 
 #' @return The \code{clonealign_fit} object for the fit that maximizes the ELBO. See \code{?clonealign} for details.
 run_clonealign <- function(gene_expression_data,
                           copy_number_data,
+                          seed = NULL,
                           initial_shrinks = c(0, 5, 10),
                           n_repeats = 3,
                           print_elbos = TRUE,
@@ -35,18 +42,27 @@ run_clonealign <- function(gene_expression_data,
   args[['gene_expression_data']] <- gene_expression_data
   args[['copy_number_data']] <- copy_number_data
   
+  total_runs <- length(initial_shrinks) * n_repeats
   
-  fits <- lapply(initial_shrinks, function(is) {
+  if(is.null(seed)) {
+    seeds <- sample(1e6, total_runs)
+  } else {
+    seeds <- withSeed(sample(1e6, total_runs), seed)
+  }
+  
+  s <- 1
+  fits <- list()
+  for(is in initial_shrinks) {
     args[['initial_shrink']] <- is
-    replicate(n_repeats, {
-      do.call(clonealign, args)
-    }, simplify = FALSE)
-  })
-  
-  fits <- unlist(fits, recursive = FALSE)
+    for(r in seq_len(n_repeats)) {
+      args[['seed']] <- seeds[s]
+      fits[[s]] <- do.call(clonealign, args)
+      s <- s + 1
+    }
+  }
   
   final_elbos <- sapply(fits, function(ca) ca$convergence_info$final_elbo)
-  median_correlations <- sapply(fits, function(ca) median(ca$correlations))
+  median_correlations <- sapply(fits, function(ca) median(ca$correlations, na.rm = TRUE))
   
   if(print_elbos) {
     message(paste("ELBOs: ", paste(final_elbos, collapse= " ")))
@@ -182,6 +198,8 @@ clonealign <- function(gene_expression_data,
                        gene_filter_threshold = 0,
                        learning_rate = 0.1,
                        x = NULL,
+                       remove_outlying_genes = TRUE,
+                       nmads = 10,
                        clone_allele = NULL,
                        cov = NULL,
                        ref = NULL,
@@ -247,6 +265,24 @@ clonealign <- function(gene_expression_data,
   if(is.null(colnames(L))) {
     colnames(L) <- paste0("clone_", letters[seq_len(C)])
   }
+  
+  if(is.null(colnames(Y))) {
+    colnames(Y) <- paste0("gene_", letters[seq_len(ncol(Y))])
+  }
+  
+  # Remove outlier genes
+  if(remove_outlying_genes) {
+    outlying_genes <- get_outlying_genes(Y, nmads)
+    if(verbose) {
+      message(paste("Removing", sum(outlying_genes), "outlier genes. Turn off with remove_outlying_genes = FALSE"))
+    }
+    Y <- Y[, !outlying_genes]
+    L <- L[!outlying_genes,]
+    
+    if(is.numeric(data_init_mu)) {
+      data_init_mu <- data_init_mu[!outlying_genes]
+    }
+  }
 
 
   # Sanity checking done - time to call em algorithm
@@ -272,9 +308,7 @@ clonealign <- function(gene_expression_data,
                                data_init_mu = data_init_mu)
   
 
-
-
-  tflow_res$clone = clone_assignment(tflow_res$ml_params$clone_probs, colnames(L), clone_call_probability)
+  tflow_res$clone <- clone_assignment(tflow_res$ml_params$clone_probs, colnames(L), clone_call_probability)
 
   # Finally map clone names back to fitted values
   colnames(tflow_res$ml_params$clone_probs) <- colnames(L)
@@ -283,7 +317,17 @@ clonealign <- function(gene_expression_data,
       colnames(tflow_res$clone_probs_from_snv) <- colnames(L)
   }
   
-  tflow_res$correlations <- compute_correlations(Y, L, tflow_res$clone)
+  tflow_res$correlations <- compute_correlations(Y[,tflow_res$retained_genes], 
+                                                 L[tflow_res$retained_genes,], 
+                                                 tflow_res$clone)
+  
+  if(any(!is.na(tflow_res$correlations))) {
+    if(quantile(tflow_res$correlations, p = 0.25, na.rm = TRUE) < 0) {
+      warning('Less than 75% of genes positively correlated with expression - assignment may have failed\n')
+    }
+  }
+  
+  tflow_res$seed <- seed
 
   structure(tflow_res, class = "clonealign_fit")
 
@@ -418,3 +462,16 @@ compute_ca_fit_mse <- function(fit, Y, L,
   mse
 }
 
+#' Get outlier genes
+#' 
+#' @keywords internal
+#' 
+#' @param Y Cell by gene matrix of counts
+#' @param nmads Number of mads above which gene is considered outlier
+#' 
+#' @importFrom stats mad
+get_outlying_genes <- function(Y, nmads) {
+  gene_means <- colMeans(Y)
+  md <- mad(gene_means)
+  gene_means > mean(gene_means) + nmads * md
+}

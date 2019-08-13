@@ -13,7 +13,8 @@ Imports:
   progress,
   reticulate,
   dplyr,
-  ggplot2
+  ggplot2,
+  R.utils
 Suggests:
   BiocStyle,
   knitr,

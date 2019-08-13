@@ -6,11 +6,12 @@
 \usage{
 clonealign(gene_expression_data, copy_number_data, max_iter = 200,
   rel_tol = 1e-06, gene_filter_threshold = 0, learning_rate = 0.1,
-  x = NULL, clone_allele = NULL, cov = NULL, ref = NULL,
-  fix_alpha = FALSE, dtype = "float32", saturate = TRUE,
-  saturation_threshold = 6, K = NULL, mc_samples = 1,
-  verbose = TRUE, seed = NULL, initial_shrink = 5,
-  clone_call_probability = 0.95, data_init_mu = TRUE)
+  x = NULL, remove_outlying_genes = TRUE, nmads = 10,
+  clone_allele = NULL, cov = NULL, ref = NULL, fix_alpha = FALSE,
+  dtype = "float32", saturate = TRUE, saturation_threshold = 6,
+  K = NULL, mc_samples = 1, verbose = TRUE, seed = NULL,
+  initial_shrink = 5, clone_call_probability = 0.95,
+  data_init_mu = TRUE)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
