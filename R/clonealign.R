@@ -25,7 +25,7 @@
 #' be no point in multiple runs.
 #' 
 #' @importFrom stats median
-#' @importFrom R.Utils withSeed
+#' @importFrom R.utils withSeed
 #' 
 #' @export
 #' 
