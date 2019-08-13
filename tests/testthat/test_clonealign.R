@@ -10,7 +10,9 @@ test_that("clonealign(...) returns a valid object", {
 
   L <- rowData(example_sce)[, c("A", "B", "C")]
 
-  cal <- clonealign(example_sce, L, max_iter = 5)
+  suppressWarnings({
+    cal <- clonealign(example_sce, L, max_iter = 5, seed = 123)
+  })
 
   expect_is(cal, "clonealign_fit")
 
@@ -26,7 +28,9 @@ test_that("clonealign(...) returns a valid object", {
 
   expect_equal(N, nrow(cal$ml_params$clone_probs))
 
-  expect_equal(G, length(cal$ml_params$mu))
+  expect_equal(length(cal$retained_genes), length(cal$ml_params$mu))
+  
+  expect_lte(length(cal$ml_params$mu), G)
 
   expect_true(all(c("clone_probs", "mu", "s") %in% names(cal$ml_params)))
   

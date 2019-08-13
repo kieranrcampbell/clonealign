@@ -8,7 +8,7 @@ author:
     - Department of Molecular Oncology, BC Cancer Agency
     - UBC Data Science Institute, University of British Columbia
   email: kicampbell@bccrc.ca
-date: "May 2019"
+date: "August 2019"
 package: clonealign
 bibliography: bibliography.bib
 output: 
@@ -121,11 +121,13 @@ head(cnv_data)
 ## Model fitting
 
 The model is fitted with a basic call to `run_clonealign`, 
-which calls the `clonealign` function across a range of parameter initializations and picks the model fit that achieves the best ELBO.
+which calls the `clonealign` function across a range of parameter initializations and picks the model fit that achieves the best ELBO. 
 
 ```{r}
-cal <- run_clonealign(example_sce, cnv_data)
+cal <- run_clonealign(example_sce, cnv_data, seed = 123)
 ```
+
+Note we have set a random seed, which in turn will set seeds for each of the runs to ensure reproducibility.
 
 ```{r}
 print(cal)
@@ -134,7 +136,7 @@ print(cal)
 We can plot the ELBO to ensure convergence:
 
 ```{r}
-qplot(seq_along(cal$elbo), cal$elbo, geom = c("point", "line")) +
+qplot(seq_along(cal$convergence_info$elbo), cal$convergence_info$elbo, geom = c("point", "line")) +
   labs(x = "Iteration", y = "ELBO")
 ```
 
@@ -203,12 +205,9 @@ where the `*_str` identifies the columns of `rowData(example_sce)` to look for t
 
 ## Evaluating the clone assignment
 
-`clonealign` will assign single-cell RNA-seq to clones no matter how good the fit and no matter whether the clones actually exist in the expression data. A simple yet effective metric is to evaluate the correlation of the expression with copy number after assignment. If the clone assignment has been unsuccessful, then this should be a distribution scattered around a mean close to zero. This is computed in the `correlations` slot of clonealign:
+`clonealign` will assign single-cell RNA-seq to clones no matter how good the fit and no matter whether the clones actually exist in the expression data. A simple yet effective metric is to evaluate the correlation of the expression with copy number after assignment. If the clone assignment has been unsuccessful, then this should be a distribution scattered around a mean close to zero. This is computed in the `correlations` slot of the `clonealign_fit`.
 
-```{r}
-qplot(cal$correlations) +
-  geom_vline(xintercept = median(cal$correlations, na.rm = TRUE), colour = 'darkred', linetype = 2)
-```
+
 
 While we have too few genes in this example to critically evaluate, ideally most of this distribution should sit above 0 in real data.
 

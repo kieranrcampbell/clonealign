@@ -374,7 +374,6 @@ inference_tflow <- function(Y_dat,
   elbo_val <- sess$run(elbo, feed_dict = fd)
   
   if(is.na(elbo_val)) {
-    browser()
     stop("Initial elbo is NA")
   }
 
@@ -412,7 +411,6 @@ inference_tflow <- function(Y_dat,
 
     
     if(is.na(mean(abs(elbo_diffs)))) {
-      browser()
     }
     
     if(mean(abs(elbo_diffs)) < rel_tol)

@@ -117,6 +117,11 @@ run_clonealign <- function(gene_expression_data,
 #' than this value, then the clone is "unassigned".
 #' @param data_init_mu Should the mu parameters be initialized using the data? (This typically speeds up convergence)
 #' @param seed The random seed. See \code{details}.
+#' @param remove_outlying_genes Logical - should genes whose expression is an outlier wrt
+#' all others be removed?
+#' @param nmads The number of median absolute deviations (MADs) the per-gene mean of the 
+#' raw counts is from the overall mean to be considered an outlier 
+#' 
 #'
 #'
 #'
@@ -181,6 +186,7 @@ run_clonealign <- function(gene_expression_data,
 #'
 #' @importFrom methods is
 #' @importFrom SummarizedExperiment assay assays
+#' @importFrom stats quantile
 #'
 #' @export
 #'
