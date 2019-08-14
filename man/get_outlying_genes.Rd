@@ -11,7 +11,15 @@ get_outlying_genes(Y, nmads)
 
 \item{nmads}{Number of mads above which gene is considered outlier}
 }
+\value{
+A logical vector whether each gene (as represented by a column of Y) 
+is an outlier
+}
 \description{
 Get outlier genes
+}
+\examples{
+Y <- matrix(rpois(200, 10), 20, 10)
+clonealign:::get_outlying_genes(Y, 3)
 }
 \keyword{internal}

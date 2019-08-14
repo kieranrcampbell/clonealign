@@ -29,7 +29,14 @@
 #' 
 #' @export
 #' 
-#' @return The \code{clonealign_fit} object for the fit that maximizes the ELBO. See \code{?clonealign} for details.
+#' @return The \code{clonealign_fit} object for the fit that maximizes the ELBO. 
+#' See \code{?clonealign} for details.
+#' 
+#' @examples 
+#' library(SummarizedExperiment)
+#' data("example_sce")
+#' L <- rowData(example_sce)[,c("A", "B", "C")]
+#' run_clonealign(example_sce, L, initial_shrinks = c(1), n_repeats = 1, seed = 5)
 run_clonealign <- function(gene_expression_data,
                           copy_number_data,
                           seed = NULL,
@@ -475,7 +482,13 @@ compute_ca_fit_mse <- function(fit, Y, L,
 #' @param Y Cell by gene matrix of counts
 #' @param nmads Number of mads above which gene is considered outlier
 #' 
+#' @return A logical vector whether each gene (as represented by a column of Y) 
+#' is an outlier 
 #' @importFrom stats mad
+#' 
+#' @examples 
+#' Y <- matrix(rpois(200, 10), 20, 10)
+#' clonealign:::get_outlying_genes(Y, 3)
 get_outlying_genes <- function(Y, nmads) {
   gene_means <- colMeans(Y)
   md <- mad(gene_means)

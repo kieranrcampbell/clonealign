@@ -33,6 +33,12 @@ be filtered out (removes genes with no counts by default)}
 \item{x}{An optional vector of covariates, e.g. corresponding to batch or patient. Can be a vector of a single
 covariate or a sample by covariate matrix. Note this should not contain an intercept.}
 
+\item{remove_outlying_genes}{Logical - should genes whose expression is an outlier wrt
+all others be removed?}
+
+\item{nmads}{The number of median absolute deviations (MADs) the per-gene mean of the 
+raw counts is from the overall mean to be considered an outlier}
+
 \item{clone_allele}{A clone-by-variant matrix of copy numbers for each variant}
 
 \item{cov}{A cell-by-variant matrix of coverage counts}

@@ -124,7 +124,7 @@ The model is fitted with a basic call to `run_clonealign`,
 which calls the `clonealign` function across a range of parameter initializations and picks the model fit that achieves the best ELBO. 
 
 ```{r}
-cal <- run_clonealign(example_sce, cnv_data, seed = 123)
+cal <- run_clonealign(t(counts(example_sce)), cnv_data, seed = 123)
 ```
 
 Note we have set a random seed, which in turn will set seeds for each of the runs to ensure reproducibility.

@@ -26,7 +26,8 @@ See \code{?clonealign}.}
 \item{...}{Additional arguments to pass to \code{clonealign(...)}}
 }
 \value{
-The \code{clonealign_fit} object for the fit that maximizes the ELBO. See \code{?clonealign} for details.
+The \code{clonealign_fit} object for the fit that maximizes the ELBO. 
+See \code{?clonealign} for details.
 }
 \description{
 Run \code{clonealign} across a range of initializations and select the fit 
@@ -41,4 +42,10 @@ while at 10 they are semi hard assigned to the most likely initial values.
 Note that the \code{seed} argument here is used to initialize seeds for the different
 runs of clonealign -- otherwise each would have the same seed and there would
 be no point in multiple runs.
+}
+\examples{
+library(SummarizedExperiment)
+data("example_sce")
+L <- rowData(example_sce)[,c("A", "B", "C")]
+run_clonealign(example_sce, L, initial_shrinks = c(1), n_repeats = 1, seed = 5)
 }
