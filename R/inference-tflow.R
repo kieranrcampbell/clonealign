@@ -219,7 +219,7 @@ inference_tflow <- function(Y_dat,
 
   if(is.logical(data_init_mu)) {
     if(data_init_mu) {
-      mu_guess <- colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
+      mu_guess <- colMeans(data$Y / rowMeans(data$Y)) # old: colMeans(data$Y / rowMeans(data$Y)) / rowMeans(data$L)
     } else {
       mu_guess <- rep(1, data$G)
     }

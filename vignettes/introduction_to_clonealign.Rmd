@@ -8,7 +8,7 @@ author:
     - Department of Molecular Oncology, BC Cancer Agency
     - UBC Data Science Institute, University of British Columbia
   email: kicampbell@bccrc.ca
-date: "August 2019"
+date: "September 2019"
 package: clonealign
 bibliography: bibliography.bib
 output: 
@@ -118,13 +118,32 @@ head(cnv_data)
 
 
 
+
+We next run the `preprocess_for_clonealign` that performs the following filtering steps:
+
+* Removes genes with fewer than `min_counts_per_gene` counts mapped
+* Removes cells with fewer than `min_counts_per_cell` counts mapped
+* If `remove_outlying_genes` is `TRUE`, removes genes whose mean expression is more than
+`nmads` MADs away from the overall mean
+* Removes genes whose maximum copy number is greater than `max_copy_number`
+* If `remove_genes_same_copy_number` is `TRUE`, removes genes whose copy number is the
+same across all clones
+
+Note that it is critical before running clonealign that **genes on the sex chromosomes are removed**, as these violate the gene dosage assumption due to e.g. X inactivation. To get a list of genes and their respective chromosomes, we suggest using the [annotables](https://github.com/stephenturner/annotables) package.
+
+
+```{r}
+ca_data <- preprocess_for_clonealign(example_sce, cnv_data)
+```
+
+
 ## Model fitting
 
 The model is fitted with a basic call to `run_clonealign`, 
 which calls the `clonealign` function across a range of parameter initializations and picks the model fit that achieves the best ELBO. 
 
 ```{r}
-cal <- run_clonealign(t(counts(example_sce)), cnv_data, seed = 123)
+cal <- run_clonealign(ca_data$gene_expression_data, ca_data$copy_number_data, seed = 123)
 ```
 
 Note we have set a random seed, which in turn will set seeds for each of the runs to ensure reproducibility.
@@ -154,9 +173,10 @@ pheatmap::pheatmap(cal$ml_params$clone_probs)
 ```
 
 
-This can easily be added to the `SingleCellExperiment` for visualization with `scater`:
+This can easily be added to the `SingleCellExperiment` for visualization with `scater`, after subsetting to the retained cells from the `preprocess_for_clonealign` call
 
 ```{r}
+example_sce <- example_sce[, ca_data$retained_cells]
 example_sce$clone <- clones
 example_sce <- normalize(example_sce)
 plotPCA(example_sce, ncomponents = 3, colour_by = "clone")

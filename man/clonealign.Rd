@@ -6,12 +6,11 @@
 \usage{
 clonealign(gene_expression_data, copy_number_data, max_iter = 200,
   rel_tol = 1e-06, gene_filter_threshold = 0, learning_rate = 0.1,
-  x = NULL, remove_outlying_genes = TRUE, nmads = 10,
-  clone_allele = NULL, cov = NULL, ref = NULL, fix_alpha = FALSE,
-  dtype = "float32", saturate = TRUE, saturation_threshold = 6,
-  K = NULL, mc_samples = 1, verbose = TRUE, seed = NULL,
-  initial_shrink = 5, clone_call_probability = 0.95,
-  data_init_mu = TRUE)
+  x = NULL, clone_allele = NULL, cov = NULL, ref = NULL,
+  fix_alpha = FALSE, dtype = "float32", saturate = TRUE,
+  saturation_threshold = 6, K = NULL, mc_samples = 1,
+  verbose = TRUE, seed = NULL, initial_shrink = 5,
+  clone_call_probability = 0.95, data_init_mu = TRUE)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -32,12 +31,6 @@ be filtered out (removes genes with no counts by default)}
 
 \item{x}{An optional vector of covariates, e.g. corresponding to batch or patient. Can be a vector of a single
 covariate or a sample by covariate matrix. Note this should not contain an intercept.}
-
-\item{remove_outlying_genes}{Logical - should genes whose expression is an outlier wrt
-all others be removed?}
-
-\item{nmads}{The number of median absolute deviations (MADs) the per-gene mean of the 
-raw counts is from the overall mean to be considered an outlier}
 
 \item{clone_allele}{A clone-by-variant matrix of copy numbers for each variant}
 

@@ -124,10 +124,6 @@ run_clonealign <- function(gene_expression_data,
 #' than this value, then the clone is "unassigned".
 #' @param data_init_mu Should the mu parameters be initialized using the data? (This typically speeds up convergence)
 #' @param seed The random seed. See \code{details}.
-#' @param remove_outlying_genes Logical - should genes whose expression is an outlier wrt
-#' all others be removed?
-#' @param nmads The number of median absolute deviations (MADs) the per-gene mean of the 
-#' raw counts is from the overall mean to be considered an outlier 
 #' 
 #'
 #'
@@ -211,8 +207,6 @@ clonealign <- function(gene_expression_data,
                        gene_filter_threshold = 0,
                        learning_rate = 0.1,
                        x = NULL,
-                       remove_outlying_genes = TRUE,
-                       nmads = 10,
                        clone_allele = NULL,
                        cov = NULL,
                        ref = NULL,
@@ -283,20 +277,6 @@ clonealign <- function(gene_expression_data,
     colnames(Y) <- paste0("gene_", letters[seq_len(ncol(Y))])
   }
   
-  # Remove outlier genes
-  if(remove_outlying_genes) {
-    outlying_genes <- get_outlying_genes(Y, nmads)
-    if(verbose) {
-      message(paste("Removing", sum(outlying_genes), "outlier genes. Turn off with remove_outlying_genes = FALSE"))
-    }
-    Y <- Y[, !outlying_genes]
-    L <- L[!outlying_genes,]
-    
-    if(is.numeric(data_init_mu)) {
-      data_init_mu <- data_init_mu[!outlying_genes]
-    }
-  }
-
 
   # Sanity checking done - time to call em algorithm
   tflow_res <- inference_tflow(Y,
@@ -475,22 +455,4 @@ compute_ca_fit_mse <- function(fit, Y, L,
   mse
 }
 
-#' Get outlier genes
-#' 
-#' @keywords internal
-#' 
-#' @param Y Cell by gene matrix of counts
-#' @param nmads Number of mads above which gene is considered outlier
-#' 
-#' @return A logical vector whether each gene (as represented by a column of Y) 
-#' is an outlier 
-#' @importFrom stats mad
-#' 
-#' @examples 
-#' Y <- matrix(rpois(200, 10), 20, 10)
-#' clonealign:::get_outlying_genes(Y, 3)
-get_outlying_genes <- function(Y, nmads) {
-  gene_means <- colMeans(Y)
-  md <- mad(gene_means)
-  gene_means > mean(gene_means) + nmads * md
-}
+
