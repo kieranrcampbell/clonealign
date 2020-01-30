@@ -1,8 +1,10 @@
 sudo: required
 language: r
 warnings_are_errors: false
-dist: trusty
+dist: xenial
 r: bioc-devel
+python:
+  - "3.6"
 
 r_packages:
   - devtools
@@ -32,7 +34,5 @@ addons:
       - libv8-dev
 
 before_install:
-  - python -m pip install --user --upgrade pip
-  - pip install --user numpy
-  - pip install --user tf-nightly
-  - pip install --user --upgrade tensorflow-probability
+  - R -e 'Sys.setenv(PIP_QUIET=1); install.packages("tensorflow"); tensorflow::install_tensorflow(extra_packages="tensorflow-probability", version = "2.1.0")'
+  - R -e 'tensorflow::tf_config()'
