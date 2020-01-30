@@ -12,7 +12,6 @@
 #' @param n_repeats Number of fits to perform at each initial shrink
 #' @param print_elbos Logical - should the ELBOs inferred be printed?
 #' @param ... Additional arguments to pass to \code{clonealign(...)}
-#' @param seed Initial seed used to create seeds for multiple runs
 #' 
 #' @details
 #' This function essentially wraps \code{clonealign} and can be interacted with as such. The
@@ -20,12 +19,8 @@
 #' assigned, analagous to the E-step in EM. At 0, they are initialized evenly across clones,
 #' while at 10 they are semi hard assigned to the most likely initial values.
 #' 
-#' Note that the \code{seed} argument here is used to initialize seeds for the different
-#' runs of clonealign -- otherwise each would have the same seed and there would
-#' be no point in multiple runs.
 #' 
 #' @importFrom stats median
-#' @importFrom R.utils withSeed
 #' 
 #' @export
 #' 
@@ -36,10 +31,9 @@
 #' library(SummarizedExperiment)
 #' data("example_sce")
 #' L <- rowData(example_sce)[,c("A", "B", "C")]
-#' run_clonealign(example_sce, L, initial_shrinks = c(1), n_repeats = 1, seed = 5)
+#' run_clonealign(example_sce, L, initial_shrinks = c(1), n_repeats = 1)
 run_clonealign <- function(gene_expression_data,
                           copy_number_data,
-                          seed = NULL,
                           initial_shrinks = c(0, 5, 10),
                           n_repeats = 3,
                           print_elbos = TRUE,
@@ -51,18 +45,11 @@ run_clonealign <- function(gene_expression_data,
   
   total_runs <- length(initial_shrinks) * n_repeats
   
-  if(is.null(seed)) {
-    seeds <- sample(1e6, total_runs)
-  } else {
-    seeds <- withSeed(sample(1e6, total_runs), seed)
-  }
-  
   s <- 1
   fits <- list()
   for(is in initial_shrinks) {
     args[['initial_shrink']] <- is
     for(r in seq_len(n_repeats)) {
-      args[['seed']] <- seeds[s]
       fits[[s]] <- do.call(clonealign, args)
       s <- s + 1
     }
@@ -123,7 +110,6 @@ run_clonealign <- function(gene_expression_data,
 #' @param clone_call_probability The probability above which a cell is assigned to a clone. If no clone has probability greater
 #' than this value, then the clone is "unassigned".
 #' @param data_init_mu Should the mu parameters be initialized using the data? (This typically speeds up convergence)
-#' @param seed The random seed. See \code{details}.
 #' 
 #'
 #'
@@ -177,11 +163,6 @@ run_clonealign <- function(gene_expression_data,
 #'
 #' In each step, maximization is performed using Adam, with learning rate given by \code{learning_rate}.
 #'
-#' \strong{Random seed}
-#'
-#' The random seed can be set using the \code{seed} parameter. However, note that this disables GPU computation
-#' and parallelism. See \url{https://tensorflow.rstudio.com/tensorflow/reference/use_session_with_seed.html}
-#' for details.
 #'
 #' @return An object of class \code{clonealign_fit}. The maximum likelihood estimates of the
 #' clone assignment paramters are in the \code{clone} slot. Maximum likelihood estimates of
@@ -217,7 +198,6 @@ clonealign <- function(gene_expression_data,
                        K = NULL,
                        mc_samples = 1,
                        verbose = TRUE,
-                       seed = NULL,
                        initial_shrink = 5,
                        clone_call_probability = 0.95,
                        data_init_mu = TRUE) {
@@ -296,7 +276,6 @@ clonealign <- function(gene_expression_data,
                                K = K,
                                mc_samples = mc_samples,
                                verbose = verbose,
-                               seed = seed,
                                initial_shrink = initial_shrink,
                                data_init_mu = data_init_mu)
   
@@ -319,8 +298,7 @@ clonealign <- function(gene_expression_data,
       warning('Less than 75% of genes positively correlated with expression - assignment may have failed\n')
     }
   }
-  
-  tflow_res$seed <- seed
+
 
   structure(tflow_res, class = "clonealign_fit")
 

@@ -64,7 +64,7 @@ where $s_n$ is a cell-specific size factor, $\mu_g$ is the per-chromosome expres
 
 ```{r, eval=FALSE}
 install.packages("tensorflow")
-tensorflow::install_tensorflow(extra_packages ="tensorflow-probability", version="1.13.1")
+tensorflow::install_tensorflow(extra_packages ="tensorflow-probability", version="2.1.0")
 ```
 
 You can confirm the installation succeeded by running
@@ -143,7 +143,8 @@ The model is fitted with a basic call to `run_clonealign`,
 which calls the `clonealign` function across a range of parameter initializations and picks the model fit that achieves the best ELBO. 
 
 ```{r}
-cal <- run_clonealign(ca_data$gene_expression_data, ca_data$copy_number_data, seed = 123)
+set.seed(123L)
+cal <- run_clonealign(ca_data$gene_expression_data, ca_data$copy_number_data)
 ```
 
 Note we have set a random seed, which in turn will set seeds for each of the runs to ensure reproducibility.

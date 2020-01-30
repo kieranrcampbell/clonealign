@@ -4,9 +4,14 @@
 \alias{run_clonealign}
 \title{Run clonealign across a range of initializations}
 \usage{
-run_clonealign(gene_expression_data, copy_number_data, seed = NULL,
-  initial_shrinks = c(0, 5, 10), n_repeats = 3, print_elbos = TRUE,
-  ...)
+run_clonealign(
+  gene_expression_data,
+  copy_number_data,
+  initial_shrinks = c(0, 5, 10),
+  n_repeats = 3,
+  print_elbos = TRUE,
+  ...
+)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -14,8 +19,6 @@ run_clonealign(gene_expression_data, copy_number_data, seed = NULL,
 
 \item{copy_number_data}{A matrix or data frame of copy number calls for each clone.
 See \code{?clonealign}.}
-
-\item{seed}{Initial seed used to create seeds for multiple runs}
 
 \item{initial_shrinks}{Initial shrinkages for the clone assignment variational parameters}
 
@@ -38,14 +41,10 @@ This function essentially wraps \code{clonealign} and can be interacted with as 
 parameter \code{initial_shrinks} controls how hard the variational parameters are initially
 assigned, analagous to the E-step in EM. At 0, they are initialized evenly across clones,
 while at 10 they are semi hard assigned to the most likely initial values.
-
-Note that the \code{seed} argument here is used to initialize seeds for the different
-runs of clonealign -- otherwise each would have the same seed and there would
-be no point in multiple runs.
 }
 \examples{
 library(SummarizedExperiment)
 data("example_sce")
 L <- rowData(example_sce)[,c("A", "B", "C")]
-run_clonealign(example_sce, L, initial_shrinks = c(1), n_repeats = 1, seed = 5)
+run_clonealign(example_sce, L, initial_shrinks = c(1), n_repeats = 1)
 }

@@ -11,7 +11,7 @@ test_that("clonealign(...) returns a valid object", {
   L <- rowData(example_sce)[, c("A", "B", "C")]
 
   suppressWarnings({
-    cal <- clonealign(example_sce, L, max_iter = 5, seed = 123)
+    cal <- clonealign(example_sce, L, max_iter = 5)
   })
 
   expect_is(cal, "clonealign_fit")
@@ -39,4 +39,28 @@ test_that("clonealign(...) returns a valid object", {
 })
 
 
+test_that("Seed setting works correctly", {
+  library(SummarizedExperiment)
+  data(example_sce)
+  N <- ncol(example_sce)
+  G <- nrow(example_sce)
+  C <- 3
+  
+  L <- rowData(example_sce)[, c("A", "B", "C")]
+  
+  suppressWarnings({
+    set.seed(12345L)
+    cal1 <- clonealign(example_sce, L, max_iter = 5)
+  })
+  
+  suppressWarnings({
+    set.seed(12345L)
+    cal2 <- clonealign(example_sce, L, max_iter = 5)
+  })
+  
+  expect_equal(
+    cal1$convergence_info$final_elbo,
+    cal2$convergence_info$final_elbo
+  )
 
+})

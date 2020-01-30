@@ -4,11 +4,19 @@
 \alias{plot_clonealign}
 \title{Plot gene expression and copy number}
 \usage{
-plot_clonealign(sce, clones, cnv_data, chromosome = "1",
-  chr_str = "chr", start_str = "start_position",
-  end_str = "end_position", jitter_cnv = TRUE,
-  ggplot_palette = "Set1", expression_ylim = c(-0.15, 0.15),
-  cnv_dodge_sd = 0.1)
+plot_clonealign(
+  sce,
+  clones,
+  cnv_data,
+  chromosome = "1",
+  chr_str = "chr",
+  start_str = "start_position",
+  end_str = "end_position",
+  jitter_cnv = TRUE,
+  ggplot_palette = "Set1",
+  expression_ylim = c(-0.15, 0.15),
+  cnv_dodge_sd = 0.1
+)
 }
 \arguments{
 \item{sce}{A \code{SingleCellExperiment}. Note this must have the fields

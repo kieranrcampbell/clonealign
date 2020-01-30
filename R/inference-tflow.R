@@ -45,6 +45,11 @@ recompute_clone_assignment <- function(ca, clone_assignment_probability = 0.95) 
   ca
 }
 
+#' @keywords internal
+get_next_seed <- function() {
+  sample(.Machine$integer.max - 1, 1)
+}
+
 #' Round a number to two significant figures
 #' @keywords internal
 #' @return  The rounded number
@@ -81,33 +86,27 @@ inference_tflow <- function(Y_dat,
                             mc_samples = 1,
                             verbose = TRUE,
                             initial_shrink = 5,
-                            seed = NULL,
                             data_init_mu = data_init_mu) {
 
-  # Do a first check that we actually have tensorflow support
-  if(FALSE) { # !reticulate::py_module_available("tensorflow") && 
-    msg <- "Tensorflow does not appear to be installed\n"
-    msg <- c(msg, "To install run install.pacakges(\"tensorflow\") then tensorflow::install_tensorflow()\n")
-    msg <- c(msg, "For more details see the clonealign vignette or https://tensorflow.rstudio.com/tensorflow/articles/installation.html")
-    stop(msg)
-  }
 
-  # Get distributions
-  tfp <- reticulate::import("tensorflow_probability")
+  tf <- tf$compat$v1
+  tf$disable_v2_behavior()
+  
+  tfp <- reticulate::import('tensorflow_probability')
   tfd <- tfp$distributions
   tfb <- tfp$bijectors
+  
+  tf$reset_default_graph()
+
   
   if(verbose) {
     message("Constructing tensorflow graph")
   }
 
-  # Reset graph
-  tf$reset_default_graph()
-
-  if(!is.null(seed)) {
-    use_session_with_seed(seed)
-    ss <- tfd$SeedStream(seed, salt = 'qmu')
-  }
+  # if(!is.null(seed)) {
+  #   use_session_with_seed(seed)
+  #   ss <- tfd$SeedStream(seed, salt = 'qmu')
+  # }
 
   # Sort out the dtype
   dtype <- match.arg(dtype)
@@ -134,6 +133,7 @@ inference_tflow <- function(Y_dat,
   N <- nrow(Y_dat)
   G <- ncol(Y_dat)
   C <- ncol(L_dat)
+  K <- as.integer(K)
 
   # Sanity checks
   stopifnot(nrow(L_dat) == G)
@@ -236,8 +236,9 @@ inference_tflow <- function(Y_dat,
 
 
   # Variables to be optimized ----------
+  # browser()
   W <- tf$Variable(tf$zeros(shape = c(G, K), dtype = dtype))
-  chi <- tf$exp(tf$get_variable("chi", initializer = tf$zeros(K, dtype = dtype))) # Prior variance on W
+  chi <- tf$exp(tf$get_variable("chi", initializer = tf$zeros(shape = K, dtype = dtype))) # Prior variance on W
   psi <- tf$Variable(tf$constant(pcs, dtype = dtype))
   psi_times_W <- tf$matmul(psi, W, transpose_b = TRUE)
   if(P > 0) {
@@ -265,11 +266,8 @@ inference_tflow <- function(Y_dat,
   )
 
   S <- as.integer(mc_samples) 
-  if(!is.null(seed)) {
-    mu_samples <- qmu$sample(S, seed = ss())
-  } else {
-    mu_samples <- qmu$sample(S)
-  }
+  mu_samples <- qmu$sample(S, seed = get_next_seed())
+
 
   gamma_logits <- tf$Variable(tf$zeros(shape(N,C) , dtype = dtype))
   gamma <- tf$nn$softmax(gamma_logits)
@@ -289,7 +287,7 @@ inference_tflow <- function(Y_dat,
 
   mu_scg <- tf$einsum('sg,gc->scg', mu_samples, L)
   mu_sgcn <- tf$einsum('scg,ng->sgcn', mu_scg, random_fixed_effects)
-  mu_scn_norm_fctr <- tf$ones(1, dtype=dtype) / ( tf$reduce_sum(mu_sgcn, 1L) ) # 
+  mu_scn_norm_fctr <- tf$ones(shape(1), dtype=dtype) / ( tf$reduce_sum(mu_sgcn, 1L) ) # 
   mu_sgcn_norm <- tf$einsum('sgcn,scn->sgcn', mu_sgcn, mu_scn_norm_fctr)
   mu_scng <- tf$transpose(mu_sgcn_norm, perm = c(0L, 2L, 3L, 1L))
   
@@ -311,18 +309,18 @@ inference_tflow <- function(Y_dat,
 
   # Prior on w, psi and chi
   if(K > 0) {
-    W_log_prob <- tf$reduce_sum(tfd$Normal(loc = tf$zeros(1, dtype = dtype),
-                                           scale = tf$sqrt(tf$ones(1, dtype = dtype) / chi))$log_prob(W))
+    W_log_prob <- tf$reduce_sum(tfd$Normal(loc = tf$zeros(shape(1), dtype = dtype),
+                                           scale = tf$sqrt(tf$ones(shape(1), dtype = dtype) / chi))$log_prob(W))
 
     chi_log_prob <- tf$reduce_sum(tfd$Gamma(concentration = tf$constant(2, dtype = dtype),
-                                              rate = tf$ones(1, dtype = dtype))$log_prob(chi))
+                                              rate = tf$ones(shape(1), dtype = dtype))$log_prob(chi))
 
-    psi_pdf <- tfd$Normal(loc = tf$zeros(1, dtype = dtype), scale = tf$ones(1, dtype = dtype))
+    psi_pdf <- tfd$Normal(loc = tf$zeros(shape(1), dtype = dtype), scale = tf$ones(shape(1), dtype = dtype))
     p_psi <- psi_pdf$log_prob(psi)
   }
   # (ii) E_q[log p(theta)]
   E_log_p_p <- tf$reduce_sum(log_alpha * gamma) +
-    tf$reduce_sum(tfd$Normal(loc = tf$zeros(1, dtype = dtype), scale = tf$ones(1, dtype = dtype))$log_prob(tf$log(mu_samples))) / tf$to_float(S) +
+    tf$reduce_sum(tfd$Normal(loc = tf$zeros(shape(1), dtype = dtype), scale = tf$ones(shape(1), dtype = dtype))$log_prob(tf$log(mu_samples))) / tf$to_float(S) +
     tf$reduce_sum(tfd$Dirichlet(tf$constant(rep(1/C, C), dtype = dtype))$log_prob(tf$exp(log_alpha) + tf$constant(1e-3, dtype = dtype)))
 
   if(K > 0) {

@@ -4,10 +4,16 @@
 \alias{preprocess_for_clonealign}
 \title{Preprocess data for input to clonealign}
 \usage{
-preprocess_for_clonealign(gene_expression_data, copy_number_data,
-  min_counts_per_gene = 20, min_counts_per_cell = 100,
-  remove_outlying_genes = TRUE, nmads = 10, max_copy_number = 6,
-  remove_genes_same_copy_number = TRUE)
+preprocess_for_clonealign(
+  gene_expression_data,
+  copy_number_data,
+  min_counts_per_gene = 20,
+  min_counts_per_cell = 100,
+  remove_outlying_genes = TRUE,
+  nmads = 10,
+  max_copy_number = 6,
+  remove_genes_same_copy_number = TRUE
+)
 }
 \arguments{
 \item{gene_expression_data}{Input gene expression data. See \code{clonealign} for details}
@@ -27,9 +33,6 @@ raw counts is from the overall mean to be considered an outlier}
 \item{max_copy_number}{Maximum copy number per gene to retain (see "saturation" under original paper)}
 
 \item{remove_genes_same_copy_number}{Logical - should genes with the same copy number in all clones be removed?}
-
-\item{log_normalized_expression_values}{If \code{gene_expression_data} is a matrix of counts,
-an equally sized matrix of log normalized counts for scran highly variable gene selection}
 }
 \value{
 A list with entries \code{gene_expression_data} and \code{copy_number_data}

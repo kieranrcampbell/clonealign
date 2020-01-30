@@ -32,7 +32,7 @@ For more info see the NEWS.md file.
 
 ```r
 install.packages("tensorflow")
-tensorflow::install_tensorflow(extra_packages ="tensorflow-probability", version="nightly")
+tensorflow::install_tensorflow(extra_packages ="tensorflow-probability", version="2.1.0")
 install.packages("devtools") # If not already installed
 install_github("kieranrcampbell/clonealign")
 ```

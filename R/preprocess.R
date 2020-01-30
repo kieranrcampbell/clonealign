@@ -76,8 +76,6 @@ get_outlying_genes <- function(Y, nmads) {
 #' raw counts is from the overall mean to be considered an outlier 
 #' @param remove_genes_same_copy_number Logical - should genes with the same copy number in all clones be removed?
 #' @param max_copy_number Maximum copy number per gene to retain (see "saturation" under original paper)
-#' @param log_normalized_expression_values If \code{gene_expression_data} is a matrix of counts,
-#' an equally sized matrix of log normalized counts for scran highly variable gene selection
 #' 
 #' @export
 #' 

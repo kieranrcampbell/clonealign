@@ -4,13 +4,28 @@
 \alias{clonealign}
 \title{Assign scRNA-seq to clone-of-origin}
 \usage{
-clonealign(gene_expression_data, copy_number_data, max_iter = 200,
-  rel_tol = 1e-06, gene_filter_threshold = 0, learning_rate = 0.1,
-  x = NULL, clone_allele = NULL, cov = NULL, ref = NULL,
-  fix_alpha = FALSE, dtype = "float32", saturate = TRUE,
-  saturation_threshold = 6, K = NULL, mc_samples = 1,
-  verbose = TRUE, seed = NULL, initial_shrink = 5,
-  clone_call_probability = 0.95, data_init_mu = TRUE)
+clonealign(
+  gene_expression_data,
+  copy_number_data,
+  max_iter = 200,
+  rel_tol = 1e-06,
+  gene_filter_threshold = 0,
+  learning_rate = 0.1,
+  x = NULL,
+  clone_allele = NULL,
+  cov = NULL,
+  ref = NULL,
+  fix_alpha = FALSE,
+  dtype = "float32",
+  saturate = TRUE,
+  saturation_threshold = 6,
+  K = NULL,
+  mc_samples = 1,
+  verbose = TRUE,
+  initial_shrink = 5,
+  clone_call_probability = 0.95,
+  data_init_mu = TRUE
+)
 }
 \arguments{
 \item{gene_expression_data}{A matrix of gene counts or a
@@ -53,8 +68,6 @@ are present and 6 otherwise.}
 \item{mc_samples}{The number of Monte Carlo samples to use to estimate the ELBO}
 
 \item{verbose}{Should warnings and EM convergence information be printed? Default TRUE}
-
-\item{seed}{The random seed. See \code{details}.}
 
 \item{initial_shrink}{The strength with which the variational parameters for clone assignments are
 initially shrunk towards the most likely assignments. See \code{?run_clonealign}.}
@@ -120,12 +133,6 @@ by the absolute value of the old falls below \code{rel_tol}, the  algorithm is c
 The maximum number of iterations to acheive this is set using the \code{max_iter} parameter.
 
 In each step, maximization is performed using Adam, with learning rate given by \code{learning_rate}.
-
-\strong{Random seed}
-
-The random seed can be set using the \code{seed} parameter. However, note that this disables GPU computation
-and parallelism. See \url{https://tensorflow.rstudio.com/tensorflow/reference/use_session_with_seed.html}
-for details.
 }
 \examples{
 library(SingleCellExperiment)
