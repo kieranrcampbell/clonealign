@@ -335,9 +335,9 @@ inference_tflow <- function(Y_dat,
 
   elbo <- EE_p_y + E_log_p_p - E_log_q
 
-  gamma_init <- tf$transpose(tf$reduce_mean(p_y_on_c, axis=0L)) 
-  git <- tf$transpose(gamma_init) - tf$reduce_mean(gamma_init, 1L)
-  gamma_init <- tf$transpose(tf$constant(initial_shrink, dtype=dtype) * git / tf$reduce_mean(tf$abs(git), 0L))
+  gamma_init <- tf$reduce_sum(p_y_on_c, axis=0L)
+  gamma_init <- gamma_init - tf$reduce_logsumexp(gamma_init, 0L)
+  gamma_init <- tf$transpose(gamma_init)
   gamma_init_ph <- tf$placeholder(shape = shape(N,C), dtype=dtype)
   init_gamma <- tf$assign(gamma_logits, gamma_init_ph)
 
